@@ -1,0 +1,40 @@
+{
+    "UAV_ID": 0,
+    "FCU_TYPE": "PX4",
+    "CONNECTION": 
+    {
+        "FCU_CONNECTION": {
+            "FCU_PROTOCOL": "mavlink_udp",
+            "FCU_IP": null,
+            "FCU_PORTS": "/dev/ttyS0",
+            "FCU_BAUD":  921600
+        },
+        "GCS_CONNECTION": {
+            "GCS_PROTOCOL": "udp",
+            "LOCAL_IP": "192.168.151.200",
+            "GCS_IP":   "192.168.151.168",
+            "MSG_IN_PORT_GCS": 52001,
+            "MSG_IN_PORT_LOCAL": 52000,
+            "GCS_UART_PORT": "/dev/ttyUSB1",
+            "GCS_UART_BAUD": 57600,
+            "VIDEO_ON": false,
+            "VIDEO_PROTOCOL": "udp",
+            "VIDEO_IP": null,
+            "VIDEO_PORT": 52002
+        }
+    },
+    "UAV_TASK_SEQ":
+    {
+        "description": "UAV task sequence",
+        "UAV_CMD_TASK_WAITE"  : -1,
+        "UAV_CMD_TASK_BEGIN"  : 0,
+        "UAV_CMD_TASK_END"    : 99
+    },
+    "movement":
+    {
+        "UAV_MAX_SPEED"   : 0.25,
+        "UAV_MAX_SPEED_XYZ" : [0.25, 0.25, 0.25],
+        "UAV_MAX_XYZ" : [null, null, null],
+        "UAV_MIN_XYZ" : [null, null, null]
+    }
+}

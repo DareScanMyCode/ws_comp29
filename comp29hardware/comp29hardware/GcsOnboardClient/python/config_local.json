@@ -1,0 +1,35 @@
+{
+    "UAV_ID": 0,
+    "CONNECTION": 
+    {
+        "FCU_CONNECTION": {
+            "FCU_PROTOCOL": "mavlink_udp",
+            "FCU_IP": null,
+            "FCU_PORTS": "/dev/ttyUSB0",
+            "FCU_BAUD":  500000
+        },
+        "GCS_CONNECTION": {
+            "GCS_PROTOCOL": "udp",
+            "LOCAL_IP": "127.0.0.1",
+            "GCS_IP":   "127.0.0.1",
+            "MSG_IN_PORT_GCS": 52001,
+            "MSG_IN_PORT_LOCAL": 52000,
+            "GCS_UART_PORT": "/dev/ttyUSB1",
+            "GCS_UART_BAUD": 57600
+        }
+    },
+    "UAV_TASK_SEQ":
+    {
+        "description": "UAV task sequence",
+        "UAV_CMD_TASK_WAITE"  : -1,
+        "UAV_CMD_TASK_BEGIN"  : 0,
+        "UAV_CMD_TASK_END"    : 99
+    },
+    "movement":
+    {
+        "UAV_MAX_SPEED"   : 0.25,
+        "UAV_MAX_SPEED_XYZ" : [0.25, 0.25, 0.25],
+        "UAV_MAX_XYZ" : [null, null, null],
+        "UAV_MIN_XYZ" : [null, null, null]
+    }
+}
