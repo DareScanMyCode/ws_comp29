@@ -40,10 +40,10 @@ class MovingAverageFilter:
         return sum(self.data) / len(self.data) if len(self.data) != 0 else 0
 
 TARGET_POS_LOCAL = np.array([
-    [2.5, 2.5],
+    [1.8, 1.8],
     [0, 0],
-    [5, 0],
-    [2.5, -2.5],
+    [3.6, 0],
+    [1.8, -1.8],
 ], dtype=np.float64)
 
 """
@@ -192,7 +192,7 @@ class FormationNode(Node):
         vv = r_hat / np.linalg.norm(r_hat)
         MAX_SIZE = 3000
         TIME_STEP = 0.1
-        MAX_SPD = 0.5
+        MAX_SPD = 0.3
         MIN_SPD = 0.08
         MIN_DIST = 1.1
         while rclpy.ok():

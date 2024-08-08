@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             "test_rend = comp29planner.test_rend:main",
             "test_formation = comp29planner.test_formation:main",
+            "comp29main = comp29planner.comp29planner_main:main"
         ],
     },
 )

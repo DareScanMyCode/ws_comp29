@@ -14,7 +14,7 @@ from geometry_msgs.msg      import PoseStamped
 from std_msgs.msg           import Float32MultiArray
 from quaternions            import Quaternion as Quaternion
 from geometry_msgs.msg      import TwistStamped
-from std_msgs.msg           import Int64, Float64
+from std_msgs.msg           import Int64, Float64, Bool
 
 class Uav2ROSNode(Node):
     def __init__(self, args):
@@ -29,7 +29,7 @@ class Uav2ROSNode(Node):
             self.get_logger().info(f"尝试使用ROS参数作为UAV ID:")
             self.uav_id             = self.declare_parameter('uav_id', -1).get_parameter_value().integer_value
         if self.uav_id != -1:
-            default_cfg_file = f"/home/cat/ws_comp29/configs/UAV_configs/config{self.uav_id}.json"
+            default_cfg_file = f"/home/cat/ws_comp29/src/configs/UAV_configs/config{self.uav_id}.json"
             self.get_logger().info(f"使用环境变量指定config file: {self.uav_id}")
         else:
             default_cfg_file = f"/home/cat/ws_comp29/configs/UAV_configs/config1.json"
@@ -46,7 +46,7 @@ class Uav2ROSNode(Node):
         self.velocity_pub       = self.create_publisher(TwistStamped,      'velocity_and_angular', 1)
         self.lidar_height_pub   = self.create_publisher(Float64,           'lidar_height', 1)
         
-        
+        self.last_vel_cmd_got_time = None
         
         # 初始化FCU
         try:
@@ -82,11 +82,27 @@ class Uav2ROSNode(Node):
             self.vel_set_ned_cb, 
             qos_profile
         )
+        
+        # 创建订阅者，订阅/arm话题
+        self.arm_flag_sub = self.create_subscription(
+            Bool,
+            '/arm',
+            self.arm_cb,
+            10  # QoS 配置
+        )
+        
+        self.arm_flag = False  # 标志变量，跟踪是否需要进行arm操作
+        
         self.vel_frd_sub
         self.vel_ned_sub
+        self.signal_lost = False  # 标志变量，跟踪信号丢失状态
+        self.cmd_watch_timer = self.create_timer(0.4, self.vel_watch)
     
-    def arm_cb(self, msg):
-        pass
+    def arm_cb(self, msg: Bool):
+        if msg.data:
+            self.get_logger().info("收到arm信号，开始进行arm操作")
+            # self.arm_flag = True
+            self.uav.arm_uav()
     
     def takeoff_cb(self, msg):
         pass
@@ -94,7 +110,27 @@ class Uav2ROSNode(Node):
     def land_cb(self, msg):
         pass
     
+    def vel_watch(self):
+        current_time = time.time()
+        if self.last_vel_cmd_got_time is not None:
+            if current_time - self.last_vel_cmd_got_time > 1.0:
+                if not self.signal_lost:
+                    self.get_logger().info("长时间未收到消息，设置速度为零")
+                    self.uav.vel_set_ned.x = 0.0
+                    self.uav.vel_set_ned.y = 0.0
+                    self.uav.vel_set_ned.z = 0.0
+                    
+                    self.uav.vel_set_frd.x = 0.0
+                    self.uav.vel_set_frd.y = 0.0
+                    self.uav.vel_set_frd.z = 0.0
+                    self.signal_lost = True  # 设置信号丢失标志
+            else:
+                if self.signal_lost:
+                    self.get_logger().info("速度信号恢复")
+                    self.signal_lost = False  # 重置信号丢失标志
+                
     def vel_set_frd_cb(self, msg: TwistStamped):
+        self.last_vel_cmd_got_time = time.time()
         # self.get_logger().info("got frd vel msg")
         # self.uav.uav_send_speed_FRD(msg.twist.linear.x,
         #                             msg.twist.linear.y,
@@ -106,6 +142,7 @@ class Uav2ROSNode(Node):
         pass
     
     def vel_set_ned_cb(self, msg: TwistStamped):
+        self.last_vel_cmd_got_time = time.time()
         # self.get_logger().info("got ned vel msg")
         # self.uav.uav_send_speed_ned(msg.twist.linear.x,
         #                             msg.twist.linear.y,

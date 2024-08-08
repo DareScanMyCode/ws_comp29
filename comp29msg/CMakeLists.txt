@@ -17,6 +17,8 @@ find_package(geometry_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DetectionResult.msg"
   "msg/DetectionArray.msg"
+  "msg/UAVInfo.msg"
+  "msg/CommunicationInfo.msg"
   DEPENDENCIES std_msgs
   DEPENDENCIES geometry_msgs
 )

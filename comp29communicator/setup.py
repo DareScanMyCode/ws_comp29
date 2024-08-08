@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'rcl_fsm_main = comp29communicator.rcl_fsm:main',
         ],
     },
 )
