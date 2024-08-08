@@ -1,5 +1,14 @@
 class MissionState:
-    MIS_WAIT             = 0
+    MIS_WAIT                    = 0
+    MIS_FORMATION_LEADER        = 10
+    MIS_FORMATION_FOLLOW        = 11
+    MIS_FORMATION_LEAVING       = 12
+    MIS_BASE                    = 20
+    MIS_BASE_STAND              = 21
+    MIS_BASE_MIVE               = 22
+    MIS_TARGET_WATCHING         = 30
+    MIS_LANDING                 = 40
+    
 
 class DetectedResult:
     def __init__(self) -> None:

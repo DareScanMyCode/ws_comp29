@@ -24,7 +24,7 @@ else
 fi
 
 # 目标IP地址范围
-for i in {201..208}; do
+for i in {202..202}; do
     IP="192.168.151.$i"
     
     echo ">>> Trying to ping $IP"

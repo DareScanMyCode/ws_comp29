@@ -287,11 +287,12 @@ class Comp29MainNode(Node):
         MIN_DIST = 1.1
         while rclpy.ok():
             rclpy.spin_once(self)
-            if self.dists is None:
-                self.get_logger().info("No dist has got!!")
-                time.sleep(1)
-                continue
-            vv = self.ctrler.update(self.dists)
+            # 根据状态执行任务
+            if self.mission_state == MissionState.MIS_WAIT:
+                pass
+            elif self.mission_state == MissionState.MIS_WAIT:
+                pass
+            vv = np.array([0.0, 0.0])
             vv = vv if np.linalg.norm(vv) < MAX_SPD else vv*MAX_SPD/np.linalg.norm(vv)
             vv[0] = self.vel_set_x_filter.get_value(vv[0])
             vv[1] = self.vel_set_y_filter.get_value(vv[1])
