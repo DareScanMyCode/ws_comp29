@@ -22,7 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'detect_test1 = comp29detector.test1:main'
+            'number_detect = comp29detector.number_detector:main',
+            'color_detect = comp29detector.color_detector:main',
         ],
     },
 )

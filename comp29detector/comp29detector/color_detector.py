@@ -23,9 +23,9 @@ class ColorTrackerNode(Node):
 
         # 创建窗口并设置鼠标回调函数
         cv2.namedWindow("Frame")
-        # cv2.setMouseCallback("Frame", self.get_color)
 
         self.timer = self.create_timer(0.1, self.process_frame)
+        self.get_logger().info(">>> Color tracker node has started")
 
     def process_frame(self):
         ret, self.frame = self.cap.read()
