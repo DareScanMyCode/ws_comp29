@@ -1,0 +1,14 @@
+{
+    "discription": "比赛中的一些参数设置",
+    "MAP_W": 50,
+    "MAP_L": 100,
+    "MAP_ANGLE": 0,
+    "NUM_UAV": 4,
+    "LEADER_ID": 1,
+    "ANGLE_LEADER_ID": 2,
+    
+    "GROUP_1": [1, 2, 3],
+    "GROUP_2": [4, 5, 6],
+    "GROUP_3": [7, 8]
+
+}

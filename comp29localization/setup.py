@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'ekf2_main = comp29localization.ekf2_main:main',
         ],
     },
 )

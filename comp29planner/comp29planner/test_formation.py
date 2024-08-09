@@ -205,14 +205,14 @@ class FormationNode(Node):
             vv = vv if np.linalg.norm(vv) < MAX_SPD else vv*MAX_SPD/np.linalg.norm(vv)
             vv[0] = self.vel_set_x_filter.get_value(vv[0])
             vv[1] = self.vel_set_y_filter.get_value(vv[1])
-            vel_ned_msg = TwistStamped()
-            vel_ned_msg.twist.linear.x = vv[0] if math.fabs(vv[0]) > MIN_SPD else 0.0
-            vel_ned_msg.twist.linear.y = vv[1] if math.fabs(vv[1]) > MIN_SPD else 0.0
+            vel_frd_msg = TwistStamped()
+            vel_frd_msg.twist.linear.x = vv[0] if math.fabs(vv[0]) > MIN_SPD else 0.0
+            vel_frd_msg.twist.linear.y = vv[1] if math.fabs(vv[1]) > MIN_SPD else 0.0
             self.get_logger().info(
                 f"d:{self.dists[0] :6.2f} {self.dists[1] :6.2f} {self.dists[2] :6.2f} {self.dists[3] :6.2f} == " + 
                 f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}"
             )
-            self.vel_ned_pub.publish(vel_ned_msg)
+            self.vel_frd_pub.publish(vel_frd_msg)
             # rclpy.spin_once(self)
             time.sleep(0.1)
         

@@ -4,6 +4,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 import time
 from quaternions import Quaternion as Quaternion
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, DurabilityPolicy
 import math
 class Gimbal2ROSNode(Node):
     def __init__(self, args):
@@ -21,12 +22,31 @@ class Gimbal2ROSNode(Node):
         except Exception as e:
             self.get_logger().warn(f"Failed to initialize gimbal: {e}")
             return
+        # 订阅
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # 设置可靠性为RELIABLE
+            # history=QoSHistoryPolicy.SYSTEM_DEFAULT,         # 只保留最新的历史消息
+            durability=DurabilityPolicy.VOLATILE,
+
+            depth=1                                    # 历史消息的队列长度
+        )
+        
+        self.gimbal_state_sub = self.create_subscription(PoseStamped, '/gimbalrpy_setpoint', self.gimbal_state_callback, qos_profile)
+        
         # 打印参数
         self.get_logger().info(f'Using port: {self.gimbal_port}')
         self.get_logger().info(f'Publishing   gimbal rpy       data to: gimbalrpy_data')
         self.get_logger().info(f'Publishing   gimbal imu rpy   data to: gimbalimu_data')
     
-    def run(self):
+    def gimbal_state_callback(self, msg: PoseStamped):
+        r = msg.pose.position.x
+        p = msg.pose.position.y
+        y = msg.pose.position.z
+        
+        self.gimbal.set_angle_degree(r, p, y)
+        self.get_logger().info(f'GIMBAL SET @ ROLL {r}, PITCH {p}, YAW {y}')
+        
+    def listing_t(self):
         rate = self.create_rate(int(self.gimbal_pub_fps))
         self.get_logger().info(f"gimbal thread begin @ {self.gimbal_pub_fps} FPS")
         while rclpy.ok() and not self.gimbal.should_stop:
@@ -69,7 +89,15 @@ class Gimbal2ROSNode(Node):
             # 发布四元数消息
             self.gimbal_imu_rpy_pub.publish(imu_quaternion_msg)
             rate.sleep()
+        
         self.gimbal.stop()
+        
+    def run(self):
+        from threading import Thread
+        t = Thread(target=self.listing_t)
+        t.start()
+        rclpy.spin(self)
+        
 
 def main(args=None):
     rclpy.init()

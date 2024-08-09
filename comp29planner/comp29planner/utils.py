@@ -5,10 +5,16 @@ class MissionState:
     MIS_FORMATION_LEAVING       = 12
     MIS_BASE                    = 20
     MIS_BASE_STAND              = 21
-    MIS_BASE_MIVE               = 22
+    MIS_BASE_MOVE               = 22
     MIS_TARGET_WATCHING         = 30
     MIS_LANDING                 = 40
-    
+
+
+class AgentRole:
+    ROLE_LEADER                 = 1     # leader
+    ROLE_ANGLE_LEADER           = 2     # 第二leader
+    ROLE_FOLLOWER               = 3     # Follower
+    ROLE_BASE                   = 10    # 基站
 
 class DetectedResult:
     def __init__(self) -> None:

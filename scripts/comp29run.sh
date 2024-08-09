@@ -11,11 +11,17 @@ NC='\033[0m' # 没有颜色（重置）
 
 # 检查参数
 BUILD_FLAG=false
+DEBUG_FLAG=false
 
 for arg in "$@"
 do
     if [ "$arg" == "--build" ]; then
         BUILD_FLAG=true
+        break
+    fi
+    if [ "$arf" == "--debug" ]; then
+        DEBUG_FLAG=true
+        export RCUTILS_LOGGING_SEVERITY_THRESHOLD=DEBUG
         break
     fi
 done
@@ -30,11 +36,11 @@ check_and_set_env() {
 
     if [ -z "$env_var_value" ]; then
         read -p ">>> ${YELLOW}环境变量 $env_var_name 未设置，请输入值: ${NC}" env_var_value
-        echo "export $env_var_name=$env_var_value" >> ~/.bashrc
+        echo -e "export $env_var_name=$env_var_value" >> ~/.bashrc
         export $env_var_name=$env_var_value
-        echo ">>> ${YELLOW}$env_var_name 设置为 $env_var_value 并已写入 .bashrc"
+        echo -e ">>> ${YELLOW}$env_var_name 设置为 $env_var_value 并已写入 .bashrc"
     else
-        echo "$env_var_name 当前值为 $env_var_value ${NC}"
+        echo -e "$env_var_name 当前值为 ${GREEN} $env_var_value ${NC}"
     fi
 }
 
@@ -44,13 +50,13 @@ check_and_set_env "ROS_DOMAIN_ID"
 
 # 比较UAV_ID和ROS_DOMAIN_ID
 if [ "$UAV_ID" != "$ROS_DOMAIN_ID" ]; then
-    echo ">>> ${RED}UAV_ID ($UAV_ID) 和 ROS_DOMAIN_ID ($ROS_DOMAIN_ID) 不同，请确保它们一致。${NC}"
+    echo -e ">>> ${RED}UAV_ID ($UAV_ID) 和 ROS_DOMAIN_ID ($ROS_DOMAIN_ID) 不同，请确保它们一致。${NC}"
 fi
 
 # 设置ros2的logger格式
 echo ">>> 设置ROS 2 日志格式"
 export RCUTILS_LOGGING_BUFFERED_STREAM=1
-export RCUTILS_CONSOLE_OUTPUT_FORMAT="{node_name} [{severity}] [{time}]: {message}"
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}]: {message}"
 
 # 重新加载 .bashrc 以应用更改
 # source ~/.bashrc
