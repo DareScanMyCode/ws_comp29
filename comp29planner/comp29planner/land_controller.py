@@ -4,6 +4,7 @@ from geometry_msgs.msg import Point, TwistStamped
 from comp29msg.msg import DetectionResult
 import rclpy.time
 from .utils import *
+from typing import Literal
 MAX_LATENCY = rclpy.time.Duration(seconds=1,nanoseconds=0)
 
 # 判断在哪个象限（图是左上角为原点 →为X正方向 ↓为Y正方向）
@@ -21,44 +22,52 @@ def JudgeQuadrant(axis_x,axis_y):
 
     
 class LandController():
-    def __init__(self, args=None):
+    def __init__(self, land_pos:Literal['left_top', 'right_top', 'bottom', 'central']='central', k_img=0.5, land_spd = 0.15, threshold=0.1):
+        self.k_img = k_img  
+        self.land_spd = land_spd
+        self.threshold = threshold
+        self.final_land_flag = False
         self.dx = 0.
         self.dy = 0.
         self.Quadrant = 0
-
-    def land_ctrl(self, dx, dy):    
-        self.ready_flag = False
-        Quadrant=self.Quadrant
-        # 如果收到消息且未过时
-        if self.ready_flag:
-            if dx>0.1 or dy>0.1:    
-                # 象限
-                kx=2.
-                ky=2.
-                if Quadrant==2:
-                    vel_set_frd_x =  ky*dy
-                    vel_set_frd_y = -kx*dx
-                    vel_set_frd_z =  0.0
-                elif Quadrant==1:
-                    vel_set_frd_x =  ky*dy
-                    vel_set_frd_y =  kx*dx
-                    vel_set_frd_z =  0.0
-                elif Quadrant==3:
-                    vel_set_frd_x =  -ky*dy
-                    vel_set_frd_y =  -kx*dx
-                    vel_set_frd_z =  0.0
-                elif Quadrant==4:         
-                    vel_set_frd_x =  -ky*dy
-                    vel_set_frd_y =  kx*dx
-                    vel_set_frd_z =  0.0
-            else:
-                vel_set_frd_x =  0
-                vel_set_frd_y =  0
-                vel_set_frd_z =  0.15
+        self.land_pos = land_pos
+        self.min_height = 1
+        
+        # TODO 根据land_pos来设定停机位置
+        if self.land_pos == 'left_top':
+            self.tgt_num_pos_img = [0.75, 0.75]
+        elif self.land_pos == 'right_top':
+            self.tgt_num_pos_img = [0.25, 0.75]
+        elif self.land_pos == 'bottom':
+            self.tgt_num_pos_img = [0.5, 0.25]
+        elif self.land_pos == 'central':
+            self.tgt_num_pos_img = [0.5, 0.5]
         else:
-            vel_set_frd_x =  0.0
-            vel_set_frd_y =  0.0
-            vel_set_frd_z =  0.05
+            self.tgt_num_pos_img = [0.5, 0.5]
+
+    def land_ctrl(self, num_x, num_y, height):    
+        # -------------------------------- X
+        # |
+        # |
+        # |
+        # | Y
+        # x_err 为正，说明目标在左边，速度向左
+        # y_err 为正，说明目标在前边，速度向前
+        # 对准就降
+        if abs(num_x - self.tgt_num_pos_img[0]) < self.threshold and abs(num_y - self.tgt_num_pos_img[1]) < self.threshold:
+            # self.final_land_flag = True
+            print("已经对准目标")
+            return [0.0, 0.0, self.land_spd]
+        # 没对准但高度很低也降
+        if height <= self.min_height:
+            return [0.0, 0.0, self.land_spd]
+        # 否则调整位置
+        x_err = self.tgt_num_pos_img[0] - num_x
+        y_err = self.tgt_num_pos_img[1] - num_y
+        
+        vel_set_frd_x = self.k_img * x_err
+        vel_set_frd_y = self.k_img * y_err
+        vel_set_frd_z = 0.0
 
         return [vel_set_frd_x, vel_set_frd_y, vel_set_frd_z]
 

@@ -11,9 +11,10 @@ class MissionState:
 
 
 class AgentRole:
-    ROLE_LEADER                 = 1     # leader
-    ROLE_ANGLE_LEADER           = 2     # 第二leader
-    ROLE_FOLLOWER               = 3     # Follower
+    # 可以有多重身份
+    ROLE_FORMATION_LEADER                 = 1     # leader
+    ROLE_FORMATION_ANGLE_LEADER           = 2     # 第二leader
+    ROLE_FORMATION_FOLLOWER               = 3     # Follower
     ROLE_BASE                   = 10    # 基站
 
 class DetectedResult:

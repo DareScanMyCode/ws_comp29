@@ -3,11 +3,25 @@ from rclpy.node import Node
 from geometry_msgs.msg import Vector3
 import cv2
 import numpy as np
-
+import json
 class ColorTrackerNode(Node):
     def __init__(self):
         super().__init__('color_tracker')
-        
+        # 读取飞机ID
+        import os
+        self.uav_id = int(os.getenv('UAV_ID', -1))
+        # 读取相机配置文件
+        camera_cfg_file = "/home/cat/ws_comp29/src/configs/cameraCFG.json"
+        with open(camera_cfg_file, 'r') as f:
+            camera_cfg = json.load(f)
+            camera_cfg_index = f"UAV{self.uav_id}_CAMERA"
+            self.camera_cfg = camera_cfg[camera_cfg_index]
+            self.w = self.camera_cfg['w']
+            self.h = self.camera_cfg['h']
+            self.fps = self.camera_cfg['fps']
+            self.rot = self.camera_cfg['rot']
+            self.get_logger().info(f">>> [Color] Camera config: w:{self.w}, h:{self.h}, fps:{self.fps}, rot:{self.rot}")
+            
         # 发布器
         self.publisher = self.create_publisher(Vector3, '/color_offset', 10)
 
@@ -24,7 +38,7 @@ class ColorTrackerNode(Node):
         # 创建窗口并设置鼠标回调函数
         cv2.namedWindow("Frame")
 
-        self.timer = self.create_timer(0.1, self.process_frame)
+        self.timer = self.create_timer(0.05, self.process_frame)
         self.get_logger().info(">>> Color tracker node has started")
 
     def process_frame(self):
@@ -32,6 +46,8 @@ class ColorTrackerNode(Node):
         if not ret:
             self.get_logger().error("Failed to capture frame")
             return
+        if self.rot == 180:
+            self.frame = cv2.rotate(self.frame, cv2.ROTATE_180)
         hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
         hsv_color = self.color_blue_hsv
         lower_bound = np.array([hsv_color[0] - 5, hsv_color[1] - 30, 50])
@@ -55,8 +71,8 @@ class ColorTrackerNode(Node):
             frame_width = self.frame.shape[1]
             frame_height = self.frame.shape[0]
 
-            dx = center_x - frame_width // 2
-            dy = center_y - frame_height // 2
+            dx = frame_width  // 2 - center_x
+            dy = frame_height // 2 - center_y
 
             # 创建并发布 Vector3 消息
             msg = Vector3()
@@ -65,13 +81,13 @@ class ColorTrackerNode(Node):
             msg.z = 0.0  # z 轴值为 0
             self.publisher.publish(msg)
 
-        # cv2.imshow("Frame", self.frame)
+        cv2.imshow("Frame", self.frame)
 
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     self.destroy_node()
-        #     cv2.destroyAllWindows()
-        #     self.cap.release()
-        #     rclpy.shutdown()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            self.destroy_node()
+            cv2.destroyAllWindows()
+            self.cap.release()
+            rclpy.shutdown()
 
 def main(args=None):
     rclpy.init(args=args)

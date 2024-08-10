@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-from UDPProcess import UDPCommunicator
+from  comp29communicator.UDPProcess import UDPCommunicator
 import numpy as np
 #import rospy
 import random
@@ -10,7 +10,7 @@ import math
 import time
 import functools
 import schedule
-import fsm_command
+import  comp29communicator.fsm_command
 
 '''
   parameters

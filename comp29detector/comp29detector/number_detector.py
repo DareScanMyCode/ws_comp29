@@ -219,7 +219,7 @@ parser.add_argument('--img_save', action='store_true', default=True, help='save 
 # parser.add_argument('--anno_json', type=str, default='../../../datasets/COCO/annotations/instances_val2017.json', help='coco annotation path')
 # parser.add_argument('--img_folder', type=str, default='../model', help='img folder path')
 # parser.add_argument('--coco_map_test', action='store_true', help='enable coco map test')
-args = parser.parse_args()
+args, unkonown_args = parser.parse_known_args()
 
 # init model
 model, platform = setup_model(args)
@@ -230,6 +230,21 @@ co_helper = COCO_test_helper(enable_letter_box=True)
 class NumberDetector(Node):
     def __init__(self, video_path): #, save_path, model_path, target, device_id='rk3588', img_show=False):
         super().__init__('number_detector')
+        import os, json
+        self.uav_id = int(os.getenv('UAV_ID', -1))
+        # 读取相机配置文件
+        camera_cfg_file = "/home/cat/ws_comp29/src/configs/cameraCFG.json"
+        with open(camera_cfg_file, 'r') as f:
+            camera_cfg = json.load(f)
+            camera_cfg_index = f"UAV{self.uav_id}_CAMERA"
+            self.camera_cfg = camera_cfg[camera_cfg_index]
+            self.w = self.camera_cfg['w']
+            self.h = self.camera_cfg['h']
+            self.fps = self.camera_cfg['fps']
+            self.rot = self.camera_cfg['rot']
+            self.get_logger().info(f">>> [Color] Camera config: w:{self.w}, h:{self.h}, fps:{self.fps}, rot:{self.rot}")
+            
+            
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,  # 设置可靠性为RELIABLE
             history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
@@ -246,6 +261,8 @@ class NumberDetector(Node):
                     print("None frame")
                     time.sleep(1)
                     continue
+                if self.rot == 180:
+                    img_src = cv2.rotate(img_src, cv2.ROTATE_180)
                 cv2.imshow("frame", img_src)
                 cv2.waitKey(1)
                 '''

@@ -8,13 +8,14 @@ import rclpy.time
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
+from comp29msg.msg import CommunicationInfo, UAVInfo
 
 import numpy as np
 import scipy
-from numpy import array
+from numpy import array, zeros
 
-from ekf_utils import dshot_2_T
-from ekf_utils import quaternion2euler, euler2quaternion, constraint_yaw, constraint_float
+from comp29localization.ekf_utils import dshot_2_T
+from comp29localization.ekf_utils import quaternion2euler, euler2quaternion, constraint_yaw, constraint_float
 
 '''
     UAV Parameters
@@ -23,6 +24,12 @@ uav_id  = 3
 acc_max = 5  # m / s^2
 uav_m = 1.35
 g = 9.81
+dt = 0.001
+#
+swarm_num = 8
+t_uwb_sampling = 2.5            # UWB以3秒为更新周期, 其中2.5秒等待, 0.5秒的区间用于接收数据
+t_uwb_recv_cutoff = 0.5         # 前者是为了保证有足够的运动距离, 不然测出来全是噪声
+                                # 后者不能太宽也不能太窄, 在这个区间内收到的所有位置信息都会被记录且更新, 用于位置修正
 '''
     Debugging options
 '''
@@ -203,6 +210,24 @@ def vicon_cb(msg:PoseStamped):
     if is_debugging_data_recv:
         print("[vicon]")
         print(vicon_data)
+
+comm_info = CommunicationInfo()
+is_comm_info_updated = False
+def comm_info_cb(msg:CommunicationInfo):
+    #
+    global comm_info, is_comm_info_updated
+    #
+    comm_info = msg
+    is_comm_info_updated = True
+
+this_uav_uwb_data = Float32MultiArray()
+is_this_uav_uwb_updated = False
+def this_uav_uwb_cb(msg:Float32MultiArray):
+    #
+    global this_uav_uwb_data, is_this_uav_uwb_updated
+    #
+    this_uav_uwb_data = msg
+    is_this_uav_uwb_updated = True
 
 def EKF_prediction(Xk, Pk, acc, acc_last, gyro, gyro_last, dt, is_debugging=False):
     # \dot X    = V
@@ -756,6 +781,121 @@ def EKF_update_servo(Xk, Pk, servo, servo_last, dt, rpy=None, is_debugging=False
 
     return X, K, Pt
 
+def optimize_pose_in_frames(Xt_all, distance_matrix):
+    """
+    :param Xt_all:              【矩阵】n架无人机位置信息[ x y z ] 维度：n×3
+    :param distance_matrix:     【矩阵】n架无人机相对位置信息       维度：n×n
+    :return Xt_all:             【矩阵】更新后无人机位置信息        维度：n×3
+    """
+    count = len(Xt_all)
+
+    def opt_goal1(x):
+        return np.sum(x**2)
+
+    def opt_goal2(x):
+        goal2 = 0
+        for i in range(0, count):
+            for j in range(i + 1, count):
+                if distance_matrix[i][j] != 0 or distance_matrix[j][i] != 0:
+                    # 取非零距离，或取平均值
+                    if distance_matrix[i][j] == 0 and distance_matrix[j][i] != 0:
+                        dist = distance_matrix[j][i]
+                    elif distance_matrix[j][i] == 0 and distance_matrix[i][j] != 0:
+                        dist = distance_matrix[i][j]
+                    elif distance_matrix[i][j] != 0 and distance_matrix[j][i] != 0:
+                        dist = (distance_matrix[i][j] + distance_matrix[j][i]) / 2
+                    goal2 += (dist - sqrt((Xt_all[i][0] - Xt_all[j][0] + x[2 * i] - x[2 * j]) ** 2 + (
+                                        Xt_all[i][1] - Xt_all[j][1] + x[2 * i + 1] - x[2 * j + 1]) ** 2)) ** 2
+        return goal2
+
+    k1 = 5
+    k2 = 1
+
+    def opt_goal(x):
+        return k1 * opt_goal1(x) + k2 * opt_goal2(x)
+
+    initial = ravel(reshape(Xt_all[:,:2],[2*count,1]))
+    result = minimize(opt_goal, initial)
+    # 更新 Xt_all 使用优化结果
+    optimized_positions = np.array([result.x[0::2], result.x[1::2]]).T
+    Xt_all[:, :2] += optimized_positions
+    print(f"[optimize] correction amount: {optimized_positions}")
+    return Xt_all
+
+pos_x_history = []
+pos_y_history = []
+pos_z_history = []  # 如果是真机这个变量要定长, 超过长度则压一个弹一个
+def pos_filter(x, y, z, dt=0.1):
+    global pos_x_history, pos_y_history, pos_z_history
+
+    #
+    # parameters
+    N = 4
+    fc = 50.  # cutoff freq
+    fs = 400.  # samping freq
+    omega_c = 0.35  # 2 * fc / fs
+    max_len = 12 * N
+
+    bf1, af1 = scipy.signal.butter(N, omega_c, btype='low')
+    bf2, af2 = scipy.signal.butter(N, omega_c, btype='low')
+    bf3, af3 = scipy.signal.butter(N, omega_c, btype='low')
+
+    if pos_x_history.__len__() > max_len:
+        pos_x_history.pop(-1)
+        pos_y_history.pop(-1)
+        pos_z_history.pop(-1)
+    pos_x_history.append(x)
+    pos_y_history.append(y)
+    pos_z_history.append(z)
+
+    if len(pos_x_history) < 4 * N:
+        x = float(scipy.signal.lfilter(bf1, af1, array(pos_x_history))[-1])
+        y = float(scipy.signal.lfilter(bf2, af2, array(pos_y_history))[-1])
+        z = float(scipy.signal.lfilter(bf3, af3, array(pos_z_history))[-1])
+    else:
+        x = float(scipy.signal.filtfilt(bf1, af1, array(pos_x_history))[-1])
+        y = float(scipy.signal.filtfilt(bf2, af2, array(pos_y_history))[-1])
+        z = float(scipy.signal.filtfilt(bf3, af3, array(pos_z_history))[-1])
+
+    return x, y, z
+
+vel_x_history = []
+vel_y_history = []
+vel_z_history = []  # 如果是真机这个变量要定长, 超过长度则压一个弹一个
+def vel_filter(vx, vy, vz, dt=0.1):
+    global vel_x_history, vel_y_history, vel_z_history
+
+    #
+    # parameters
+    N = 4
+    fc = 50.  # cutoff freq
+    fs = 400.  # samping freq
+    omega_c = 0.35  # 2 * fc / fs
+    max_len = 12 * N
+
+    bf1, af1 = scipy.signal.butter(N, omega_c, btype='low')
+    bf2, af2 = scipy.signal.butter(N, omega_c, btype='low')
+    bf3, af3 = scipy.signal.butter(N, omega_c, btype='low')
+
+    if vel_x_history.__len__() > max_len:
+        vel_x_history.pop(-1)
+        vel_y_history.pop(-1)
+        vel_z_history.pop(-1)
+    vel_x_history.append(vx)
+    vel_y_history.append(vy)
+    vel_z_history.append(vz)
+
+    if len(vel_x_history) < 4 * N:
+        vx = float(scipy.signal.lfilter(bf1, af1, array(vel_x_history))[-1])
+        vy = float(scipy.signal.lfilter(bf2, af2, array(vel_y_history))[-1])
+        vz = float(scipy.signal.lfilter(bf3, af3, array(vel_z_history))[-1])
+    else:
+        vx = float(scipy.signal.filtfilt(bf1, af1, array(vel_x_history))[-1])
+        vy = float(scipy.signal.filtfilt(bf2, af2, array(vel_y_history))[-1])
+        vz = float(scipy.signal.filtfilt(bf3, af3, array(vel_z_history))[-1])
+
+    return vx, vy, vz
+
 acc_x_history = []
 acc_y_history = []
 acc_z_history = []                      # 如果是真机这个变量要定长, 超过长度则压一个弹一个
@@ -801,6 +941,11 @@ def main(args=None):
     global local_pos_data, local_pos_data_last, t_local_pos, t_local_pos_last, is_local_pos_data_ready
     global gps_data,       gps_data_last,       t_gps,       t_gps_last,       is_gps_data_ready
     global vicon_data,     vicon_data_last,     t_vicon,     t_vicon_last,     is_vicon_data_ready
+    global comm_info,         is_comm_info_updated
+    global this_uav_uwb_data, is_this_uav_uwb_updated
+    #
+    global swarm_num, t_uwb_sampling, t_uwb_recv_cutoff
+    global dt
 
     rclpy.init(args=args)
     node = Node('data_collector')
@@ -813,6 +958,11 @@ def main(args=None):
     local_pos_sub       = node.create_subscription(PoseStamped, 'local_position_ned', local_pos_cb, 1)
     gps_pos_sub         = node.create_subscription(PoseStamped, 'gps_position', gps_cb, 1)
     vicon_pos_sub       = node.create_subscription(PoseStamped, '/vicon_pose', vicon_cb, 1)
+    #
+    this_uav_uwb_topic_name       = 'uwb_filtered_topic'
+    this_uav_uwb_sub     = node.create_subscription(Float32MultiArray, this_uav_uwb_topic_name, this_uav_uwb_cb, 1)
+    comm_info_topic_name = "/uav" + str(uav_id) + "/comm_info"
+    uav_swarm_uwb_sub    = node.create_subscription(CommunicationInfo, comm_info_topic_name, comm_info_cb, 1)
     #
     ekf2_pos_topic_name = '/uav' + str(uav_id) + "/ekf2/pose"
     ekf2_pos_pub        = node.create_publisher(PoseStamped,  ekf2_pos_topic_name, 1)
@@ -903,6 +1053,14 @@ def main(args=None):
     index = 0
     t_attitude = time.time()
     t_attitude_last = time.time()
+    #
+    is_pos_optimized = False
+    is_dist_updated = [ False for i in range(0, swarm_num) ]
+    dist_matrix = np.zeros([10, 10])
+    companion_pos_list = [[0, 0, 0] for i in range(0, swarm_num)]
+    update_id_pair = []
+    t_uwb = time.time()
+    t_uwb_stage = t_uwb % (t_uwb_sampling + t_uwb_recv_cutoff)
     #
     while rclpy.ok():
 
@@ -1085,8 +1243,125 @@ def main(args=None):
                 print(X)
 
         #
-        # TODO
+        # 速度位置LPF
+        x_lpf,  y_lpf,  z_lpf  = pos_filter(X[0], X[1], X[2], dt=dt)
+        vx_lpf, vy_lpf, vz_lpf = vel_filter(X[3], X[4], X[5], dt=dt)
+
+        #
         # update UWB
+        t_uwb = time.time() - t0
+        t_uwb_stage = t_uwb % (t_uwb_sampling + t_uwb_recv_cutoff)
+
+        if t_uwb_stage >= t_uwb_sampling and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff:
+            #
+            # 收集数据
+
+            # CRITICAL
+            # reset
+            is_pos_optimized = False
+            
+            if is_this_uav_uwb_updated and is_comm_info_updated:
+                #
+                for i in range(0, swarm_num):
+                    companion_id_t = comm_info.uav[i].id
+                    dist_list_t = comm_info.uav[i].dist
+                    pos_t = [comm_info.uav[i].pos.pose.position.x, comm_info.uav[i].pos.pose.position.y, comm_info.uav[i].pos.pose.position.z]
+                    for j in range(0, swarm_num):
+                        if dist_list_t[j] != 0:
+                            #
+                            # 如果有数则更新取均值
+                            # 否则直接直接更新
+                            if dist_matrix[companion_id_t][j] == 0:
+                                dist_matrix[companion_id_t][j] = dist_list_t[j]             # 其实仿真数据会多一些, 这里只有这么多数据了
+                            else:
+                                dist_matrix[companion_id_t][j] = (dist_list_t[j] + dist_matrix[companion_id_t][j]) / 2
+                            #
+                            # 这里用了个trick
+                            # 一般uwb更新了, 位置大概率是更新的
+                            is_dist_updated[companion_id_t] = True
+                    #
+                    # 更新位置
+                    # 同样如果有数则更新取均值
+                    # 否则直接直接更新
+                    if not (pos_t[0] == 0 and pos_t[1] == 0 and pos_t[2] == 0):
+                        if pos_t[0] != 0:
+                            # x
+                            if companion_pos_list[companion_id_t][0] == 0:                  # 注意, index = i不等于id = i
+                                companion_pos_list[companion_id_t][0] = pos_t[0]
+                            else:
+                                companion_pos_list[companion_id_t][0] = (companion_pos_list[companion_id_t][0] + pos_t[0]) / 2
+                        if pos_t[1] != 0:
+                            # y
+                            if companion_pos_list[companion_id_t][1] == 0:
+                                companion_pos_list[companion_id_t][1] = pos_t[1]
+                            else:
+                                companion_pos_list[companion_id_t][1] = (companion_pos_list[companion_id_t][1] + pos_t[1]) / 2
+                        if pos_t[2] != 0:
+                            # z
+                            if companion_pos_list[companion_id_t][2] == 0:
+                                companion_pos_list[companion_id_t][2] = pos_t[2]
+                            else:
+                                companion_pos_list[companion_id_t][2] = (companion_pos_list[companion_id_t][2] + pos_t[2]) / 2                                
+
+                #
+                # finally
+                # generate state update pair
+                for i in range(0, swarm_num):
+                    for j in range(i + 1, swarm_num):
+                        if is_dist_updated[i] and is_dist_updated[j]:
+                            update_id_pair.append((i, j, ))
+
+            if is_this_uav_uwb_updated:
+                is_this_uav_uwb_updated = False
+            if is_comm_info_updated:
+                is_comm_info_updated = False
+
+        #
+        # 这里因为dt很小所以 * 10.1
+        # 否则乘以5.1甚至2.1就够了
+        if not is_pos_optimized and t_uwb_stage >= t_uwb_sampling + t_uwb_recv_cutoff - dt * 10.1 and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff - dt * 1.1:        
+            #
+            # 总体位置优化
+            X_opt_list = []
+            for k in range(0, update_id_pair.__len__()):
+                i = update_id_pair[k][0]
+                j = update_id_pair[k][1]
+                #
+                pos_uav_i = companion_pos_list[i]
+                pos_uav_j = companion_pos_list[j]
+                #
+                X_opt_t = np.vstack([zeros(3), zeros(3), [x_lpf, y_lpf, z_lpf], pos_uav_i, pos_uav_j])
+                X_opt_t = optimize_pose_in_frames(X_opt_t, dist_matrix)
+                X_opt_list.append(X_opt_t)
+
+            # Finally
+            # 取平均值
+            # 一定要在最后取, 避免之前结果拉扯后续结果
+            if X_opt_list.__len__():
+                for i in range(0, X_opt_list.__len__()):
+                    x_lpf = float(x_lpf + X_opt_list[i][0]) / X_opt_list.__len__()
+                    y_lpf = float(y_lpf + X_opt_list[i][1]) / X_opt_list.__len__()
+                    z_lpf = float(z_lpf + X_opt_list[i][2]) / X_opt_list.__len__()          # 最后统一改到位置输出内
+            else:
+                pass
+
+
+            # TODO
+            # 计算局部位置
+
+            # TODO
+            # 完成计算后清零dist martix
+            is_pos_optimized = True
+            #
+            is_dist_updated.clear()
+            is_dist_updated = [ False for i in range(0, swarm_num) ]
+            #
+            dist_matrix = np.zeros([10, 10])
+            #
+            companion_pos_list.clear()
+            companion_pos_list = [ [0, 0, 0] for i in range(0, swarm_num) ]
+            #
+            update_id_pair.clear()
 
         #
         # TODO
@@ -1096,9 +1371,9 @@ def main(args=None):
             ekf2_pose.header.stamp = node.get_clock().now().to_msg()
             ekf2_pose.header.frame_id = 'base_link'
             #
-            ekf2_pose.pose.position.x = X[0]
-            ekf2_pose.pose.position.y = X[1]
-            ekf2_pose.pose.position.z = X[2]
+            ekf2_pose.pose.position.x = x_lpf           # X[0]
+            ekf2_pose.pose.position.y = y_lpf           # X[1]
+            ekf2_pose.pose.position.z = z_lpf           # X[2]
             #
             ekf2_pose.pose.orientation.w = X[6]
             ekf2_pose.pose.orientation.x = X[7]
@@ -1110,14 +1385,17 @@ def main(args=None):
             #
             ekf2_vel.header.stamp = node.get_clock().now().to_msg()
             ekf2_vel.header.frame_id = 'base_link'
-            ekf2_vel.twist.linear.x = X[3]
-            ekf2_vel.twist.linear.y = X[4]
-            ekf2_vel.twist.linear.z = X[5]
+            ekf2_vel.twist.linear.x = vx_lpf            # X[3]
+            ekf2_vel.twist.linear.y = vy_lpf            # X[4]
+            ekf2_vel.twist.linear.z = vz_lpf            # X[5]
             ekf2_vel.twist.angular.x = imu_data.angular_velocity.x
             ekf2_vel.twist.angular.y = imu_data.angular_velocity.y
             ekf2_vel.twist.angular.z = imu_data.angular_velocity.z
             #
             ekf2_vel_pub.publish(ekf2_vel)
+
+            # TODO
+            # 发布局部位置
 
         if is_imu_data_ready:
             is_imu_data_ready   = False
@@ -1134,7 +1412,7 @@ def main(args=None):
         if index % 1000:
             index = 0
         #
-        time.sleep(0.001)
+        time.sleep(dt)
         rclpy.spin_once(node)
 
     rclpy.shutdown()

@@ -39,4 +39,6 @@ cd ~/ws_comp29
 colcon build
 source ~/ws_comp29/install/setup.bash
 
-ros2 run comp29planner test_formation
+export DISPLAY=:0
+# ros2 run comp29planner test_formation
+ros2 launch comp29planner comp29test_form.py

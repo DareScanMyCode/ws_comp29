@@ -4,15 +4,16 @@ import numpy as np
 import random
 import struct
 #
+import os
 import time
 import functools
 import schedule
 from colorama import Fore, Back, Style
 #
-from fsm import fsm
-from flow_monitor import getNetworkRate
-import fsm_command
-from UDPProcess import UDPCommunicator
+from comp29communicator.fsm import fsm
+from comp29communicator.flow_monitor import getNetworkRate
+import comp29communicator.fsm_command
+from comp29communicator.UDPProcess import UDPCommunicator
 #
 import rclpy.time
 from rclpy.node import Node
@@ -108,9 +109,18 @@ class rcl_fsm(fsm):
         for i in range(0, self.known_target_num):
             for j in range(0, 2):
                 self.swarm_info.guard_list.data.append(0)
- 
+
+        # 
+        # dist mat
+        for i in range(0, self.swarm_num):
+                for j in range(0, self.swarm_num):
+                    self.swarm_info.dist_mat.data.append(0)
  
         self.is_data_received = False
+        #
+        self.ack_companion = False
+        self.ack_cmd_id = -1
+
 
     def FSMCallback(self):
         '''
@@ -143,7 +153,7 @@ class rcl_fsm(fsm):
 
 
         if self.is_send_critical_info_ack:
-            data_t = self.Pack_Critical_Status_Ack(companion_id=data_recv_t['uav_id'] + 2, cmd_id=data_recv_t['cmd_id'], is_debugging=False)        # CHECKED debugging = false
+            data_t = self.Pack_Critical_Status_Ack(companion_id=self.ack_companion, cmd_id=self.ack_cmd_id, is_debugging=False)        # CHECKED debugging = false
             for i in range(0, self.ip_list.__len__()):
                 self.udpc.send(data_t, ip_list[i], target_port)
                 time.sleep(0.005)
@@ -264,15 +274,32 @@ class rcl_fsm(fsm):
                 self.swarm_info.guard_list.data[i * 2]     = self.guard_list[i][0]
                 self.swarm_info.guard_list.data[i * 2 + 1] = self.guard_list[i][1]
 
+            #
             self.update_dist_mat(data_recv)
+            #
+            for i in range(0, self.swarm_num):
+                 for j in range(0, self.swarm_num):
+                      self.swarm_info.dist_mat.data[i * self.swarm_num + j] = self.adjacency_mat[i, j]
+            #
+            this_uav_data = self.update_this_uav_data()
+            self.swarm_info.uav.append(this_uav_data)
+            self.swarm_info.uav.sort(key=functools.cmp_to_key(self.sort_swarm_info), reverse=True)      # 不加自己的序号会错
             
-        elif data_recv_t['frame_id'] == 2:
+            if is_debugging:
+            #if True:
+                print(self.swarm_info.uav)
+
+            
+        elif data_recv['frame_id'] == 2:
             #
-            pass
-        elif data_recv_t['frame_id'] == 3:
+            companion_id_t = data_recv['id']
+            self.swarm_info.uav[companion_id_t].mission_stat = data_recv['cmd_id']
+        elif data_recv['frame_id'] == 3:
             #
-            pass
-        
+            self.ack_companion = data_recv['companion_id']
+            self.ack_cmd_id    = data_recv['cmd_id']
+            #
+            self.is_send_critical_info_ack = True
 
     def update_dist_mat(self, data_recv):
 
@@ -286,6 +313,47 @@ class rcl_fsm(fsm):
             # TODO
             # 极大极小值滤除
             self.dist_mat[companion_id, i] = dist_list_t[i]
+
+    def update_this_uav_data(self):
+        this_uav_data = UAVInfo()
+        this_uav_data.id = self.id
+        this_uav_data.group_id = self.group
+        #
+        this_uav_data.pos.pose.position.x = self.pos_xyz[0]
+        this_uav_data.pos.pose.position.y = self.pos_xyz[1]
+        this_uav_data.pos.pose.position.z = self.pos_xyz[2]
+        #
+        this_uav_data.vel.twist.linear.x = self.vel_xyz[0]
+        this_uav_data.vel.twist.linear.y = self.vel_xyz[1]
+        this_uav_data.vel.twist.linear.z = self.vel_xyz[2]
+        this_uav_data.lat = self.lat
+        this_uav_data.lon = self.lon
+        #
+        for i in range(0, self.swarm_num):
+                for j in range(0, self.swarm_num):
+                    #this_uav_data.adjacency_mat.data[i * self.swarm_num + j] = self.dist_mat[i, j]
+                    this_uav_data.adjacency_mat.data.append(self.dist_mat[i, j])
+        #
+        for i in range(0, self.swarm_num):
+            #this_uav_data.dist.data[i] = self.dist_mat[self.id, i]
+            this_uav_data.dist.data.append(self.dist_mat[self.id, i])
+        #
+        this_uav_data.tracking_tgt = self.current_tgt
+        this_uav_data.mission_stat = self.mission_status
+
+        return this_uav_data
+
+
+    def sort_swarm_info(self, x:UAVInfo, y:UAVInfo):
+        '''
+            usage:
+            strs.sort(key=functools.cmp_to_key(my_compare), reverse=True)
+        '''
+        if x.id > y.id:
+            return 1
+        elif x.id < y.id:
+            return -1
+        return 0
 
 def network_rate_thread(args=None):
     _, networkIn, networkOut = getNetworkRate(1)                # num -> 时间
@@ -308,14 +376,22 @@ def main(args=None):
 
     rclpy.init(args=args)
     node = Node('Communicator_FSM')
-
-    comm_table_dir = "/mnt/d/ubuntu_wsl/colcon_ws/src/comp29communicator/comp29communicator/data/comm_table.yaml"
+    username = os.getenv("USER", "cat")
+    if username == 'cat':
+        comm_table_dir = "/home/cat/ws_comp29/src/comp29communicator/comp29communicator/data/comm_table.yaml"
+    elif username == 'zbw':
+        comm_table_dir = "/home/zbw/ws_comp29/src/comp29communicator/comp29communicator/data/comm_table.yaml"
+        
+    else:
+        comm_table_dir = "/mnt/d/ubuntu_wsl/colcon_ws/src/comp29communicator/comp29communicator/data/comm_table.yaml"
     with open(comm_table_dir, 'r', encoding='utf-8') as f:
         comm_table_t = yaml.load(f.read(), Loader=yaml.FullLoader)
     
     if is_debugging:
-        print(comm_table_t)
-    uav_id    = comm_table_t['uav_id']
+        node.get_logger().info(f"{comm_table_t}")
+    
+    uav_id    = int(os.getenv("UAV_ID", comm_table_t['uav_id']))
+    # TODO 写死或者从config.missionCFG.json读取
     uav_group_id  = comm_table_t['group_id']
     swarm_num = comm_table_t['swarm_num']
     known_target_num = comm_table_t['known_tgt_num']
@@ -396,11 +472,11 @@ def main(args=None):
             schedule.run_pending()                                       # 运行待执行的任务队列
             time.sleep(0.005)                                            # 这个刷新速度要小于scheduled task的
     except KeyboardInterrupt:
-        print("[fsm] 服务器正在关闭...")
+        node.get_logger().info("[fsm] 服务器正在关闭...")
     finally:
         fsm_t.shutdown()
 
-    print("[fsm] all stopped ...")
+    node.get_logger().info("[fsm] all stopped ...")
 
 if __name__ == "__main__":
     main()

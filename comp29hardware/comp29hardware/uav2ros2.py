@@ -36,7 +36,7 @@ class Uav2ROSNode(Node):
             
         self.config_file        = self.declare_parameter('uav_config_file',default_cfg_file).get_parameter_value().string_value
         # TODO 是否修改成同步发送，收到信息就发送？需要修改UAVOnboard程序
-        self.fcu_pub_fps        = self.declare_parameter('fcu_pub_fps', 50.0).get_parameter_value().double_value
+        self.fcu_pub_fps        = self.declare_parameter('fcu_pub_fps', 20.0).get_parameter_value().double_value
         
         self.imu_pub            = self.create_publisher(Imu,               'imu', 1)
         self.servo_pub          = self.create_publisher(Float32MultiArray, 'servo_data', 1)
@@ -45,6 +45,7 @@ class Uav2ROSNode(Node):
         self.gps_pos_pub        = self.create_publisher(PoseStamped,       'gps_position', 1)
         self.velocity_pub       = self.create_publisher(TwistStamped,      'velocity_and_angular', 1)
         self.lidar_height_pub   = self.create_publisher(Float64,           'lidar_height', 1)
+        self.arm_state_pub      = self.create_publisher(Bool,              'arm_state', 1)
         
         self.last_vel_cmd_got_time = None
         
@@ -97,12 +98,27 @@ class Uav2ROSNode(Node):
         self.vel_ned_sub
         self.signal_lost = False  # 标志变量，跟踪信号丢失状态
         self.cmd_watch_timer = self.create_timer(0.4, self.vel_watch)
+        self.pub_timer = self.create_timer(1.0/self.fcu_pub_fps, self.pub_t)
+    
+    def run(self):
+        while rclpy.ok():
+            # self.get_logger().info("==============================")
+            rclpy.spin_once(self, timeout_sec=0.3)
+            # time.sleep(0.05)
+        self.get_logger().info("END")
+        
     
     def arm_cb(self, msg: Bool):
         if msg.data:
-            self.get_logger().info("收到arm信号，开始进行arm操作")
-            # self.arm_flag = True
-            self.uav.arm_uav()
+            self.get_logger().info("[UAV] 收到arm信号，开始进行arm操作")
+            for i in range(100):
+                self.uav.arm_uav()
+                if self.uav.is_armed:
+                    self.get_logger().info("[UAV] 无人机已经解锁")
+                    break
+                time.sleep(0.04)
+            self.get_logger().info("[UAV] 无人机解锁失败！！！！！！！！！！！！！！！")
+            
     
     def takeoff_cb(self, msg):
         pass
@@ -131,7 +147,7 @@ class Uav2ROSNode(Node):
                 
     def vel_set_frd_cb(self, msg: TwistStamped):
         self.last_vel_cmd_got_time = time.time()
-        # self.get_logger().info("got frd vel msg")
+        self.get_logger().info("got frd vel msg")
         # self.uav.uav_send_speed_FRD(msg.twist.linear.x,
         #                             msg.twist.linear.y,
         #                             msg.twist.linear.z)
@@ -153,98 +169,97 @@ class Uav2ROSNode(Node):
         self.uav.vel_mode      = self.uav.VEL_MODE_NED
         pass
     
-    def run(self):
-        rate = self.create_rate(float(self.fcu_pub_fps))
+    def pub_t(self):
+        # rate = self.create_rate(float(self.fcu_pub_fps))
         # TODO 等待所有消息都收到了？
-        while rclpy.ok():
-            rclpy.spin_once(self)
-            should_pub_imu              = True
-            should_pub_servo            = True
-            should_pub_attitude_tgt     = True
-            should_pub_local_pos        = True
-            should_pub_gps              = True
-            should_pub_vel              = True
-            should_pub_lidar_height     = True
-            # pub IMU
-            if should_pub_imu and self.uav.imu_acc is not None:
-                imu_msg = Imu()
-                imu_msg.header.stamp = self.get_clock().now().to_msg()
-                imu_msg.header.frame_id = 'imu_link'
-                imu_msg.linear_acceleration.x = self.uav.imu_acc[0]
-                imu_msg.linear_acceleration.y = self.uav.imu_acc[1]
-                imu_msg.linear_acceleration.z = self.uav.imu_acc[2]
-                imu_msg.angular_velocity.x = self.uav.imu_gyro[0]
-                imu_msg.angular_velocity.y = self.uav.imu_gyro[1]
-                imu_msg.angular_velocity.z = self.uav.imu_gyro[2]
-                fcu_rpy = [ self.uav.pose.r, self.uav.pose.p, self.uav.pose.yaw ] # ROLL PITCH HEADING
-                fcu_q   = Quaternion.from_euler(fcu_rpy, axes = ['z', 'y', 'x'])
-                imu_msg.orientation.w = fcu_q.w
-                imu_msg.orientation.x = fcu_q.x
-                imu_msg.orientation.y = fcu_q.y
-                imu_msg.orientation.z = fcu_q.z
-                # 发布IMU数据
-                self.imu_pub.publish(imu_msg)
+        # rclpy.spin_once(self)
+        should_pub_imu              = True
+        should_pub_servo            = True
+        should_pub_attitude_tgt     = True
+        should_pub_local_pos        = True
+        should_pub_gps              = True
+        should_pub_vel              = True
+        should_pub_lidar_height     = True
+        # pub IMU
+        if should_pub_imu and self.uav.imu_acc is not None:
+            imu_msg = Imu()
+            imu_msg.header.stamp = self.get_clock().now().to_msg()
+            imu_msg.header.frame_id = 'imu_link'
+            imu_msg.linear_acceleration.x = self.uav.imu_acc[0]
+            imu_msg.linear_acceleration.y = self.uav.imu_acc[1]
+            imu_msg.linear_acceleration.z = self.uav.imu_acc[2]
+            imu_msg.angular_velocity.x = self.uav.imu_gyro[0]
+            imu_msg.angular_velocity.y = self.uav.imu_gyro[1]
+            imu_msg.angular_velocity.z = self.uav.imu_gyro[2]
+            fcu_rpy = [ self.uav.pose.r, self.uav.pose.p, self.uav.pose.yaw ] # ROLL PITCH HEADING
+            fcu_q   = Quaternion.from_euler(fcu_rpy, axes = ['z', 'y', 'x'])
+            imu_msg.orientation.w = fcu_q.w
+            imu_msg.orientation.x = fcu_q.x
+            imu_msg.orientation.y = fcu_q.y
+            imu_msg.orientation.z = fcu_q.z
+            # 发布IMU数据
+            self.imu_pub.publish(imu_msg)
+        
+        # pub servo
+        if should_pub_servo and self.uav.servos is not None:
+            servo_msg = Float32MultiArray()
+            servo_msg.data = [float(self.uav.servos[i]) for i in range(4)]
+            self.servo_pub.publish(servo_msg)
             
-            # pub servo
-            if should_pub_servo and self.uav.servos is not None:
-                servo_msg = Float32MultiArray()
-                servo_msg.data = [float(self.uav.servos[i]) for i in range(4)]
-                self.servo_pub.publish(servo_msg)
-                
-            # pub attitude-tgt
+        # pub attitude-tgt
+        
+        # pub local-pos
+        if should_pub_local_pos : #and self.uav.odom_q is not None:
+            local_pos_msg = PoseStamped()
+            local_pos_msg.header.stamp = self.get_clock().now().to_msg()
+            local_pos_msg.header.frame_id = 'LOCAL_NED'
             
-            # pub local-pos
-            if should_pub_local_pos : #and self.uav.odom_q is not None:
-                local_pos_msg = PoseStamped()
-                local_pos_msg.header.stamp = self.get_clock().now().to_msg()
-                local_pos_msg.header.frame_id = 'LOCAL_NED'
-                
-                local_pos_msg.pose.position.x = float(self.uav.pose.x)
-                local_pos_msg.pose.position.y = float(self.uav.pose.y)
-                local_pos_msg.pose.position.z = float(self.uav.pose.z)
-                
-                # local_pos_msg.pose.orientation.w = self.uav.odom_q[0]
-                # local_pos_msg.pose.orientation.x = self.uav.odom_q[1]
-                # local_pos_msg.pose.orientation.y = self.uav.odom_q[2]
-                # local_pos_msg.pose.orientation.z = self.uav.odom_q[3]
-                
-                self.local_pos_pub.publish(local_pos_msg)
+            local_pos_msg.pose.position.x = float(self.uav.pose.x)
+            local_pos_msg.pose.position.y = float(self.uav.pose.y)
+            local_pos_msg.pose.position.z = float(self.uav.pose.z)
             
-            # pub gps-pos
-            if should_pub_gps and self.uav.gps is not None:
-                gps_msg = PoseStamped()
-                gps_msg.header.stamp = self.get_clock().now().to_msg()
-                gps_msg.header.frame_id = 'GPS'
-                # x:lat, y:lon
-                gps_msg.pose.position.x = self.uav.gps[0]
-                gps_msg.pose.position.y = self.uav.gps[1]
-                self.gps_pos_pub.publish(gps_msg)
+            # local_pos_msg.pose.orientation.w = self.uav.odom_q[0]
+            # local_pos_msg.pose.orientation.x = self.uav.odom_q[1]
+            # local_pos_msg.pose.orientation.y = self.uav.odom_q[2]
+            # local_pos_msg.pose.orientation.z = self.uav.odom_q[3]
             
-            # pub vel
-            if should_pub_vel and self.uav.imu_gyro is not None:
-                vel_msg = TwistStamped()
-                vel_msg.header.stamp = self.get_clock().now().to_msg()
-                vel_msg.header.frame_id = 'LOCAL_NED'
-                # linear
-                vel_msg.twist.linear.x = self.uav.vel.x
-                vel_msg.twist.linear.y = self.uav.vel.y
-                vel_msg.twist.linear.z = self.uav.vel.z
-                
-                # angular
-                vel_msg.twist.angular.x = self.uav.imu_gyro[0]
-                vel_msg.twist.angular.y = self.uav.imu_gyro[1]
-                vel_msg.twist.angular.z = self.uav.imu_gyro[2]
-                self.velocity_pub.publish(vel_msg)
+            self.local_pos_pub.publish(local_pos_msg)
+        
+        # pub gps-pos
+        if should_pub_gps and self.uav.gps is not None:
+            gps_msg = PoseStamped()
+            gps_msg.header.stamp = self.get_clock().now().to_msg()
+            gps_msg.header.frame_id = 'GPS'
+            # x:lat, y:lon
+            gps_msg.pose.position.x = self.uav.gps[0]
+            gps_msg.pose.position.y = self.uav.gps[1]
+            self.gps_pos_pub.publish(gps_msg)
+        
+        # pub vel
+        if should_pub_vel and self.uav.imu_gyro is not None:
+            vel_msg = TwistStamped()
+            vel_msg.header.stamp = self.get_clock().now().to_msg()
+            vel_msg.header.frame_id = 'LOCAL_NED'
+            # linear
+            vel_msg.twist.linear.x = self.uav.vel.x
+            vel_msg.twist.linear.y = self.uav.vel.y
+            vel_msg.twist.linear.z = self.uav.vel.z
             
-            
-            # pub lidar-height
-            if should_pub_lidar_height and self.uav.lidar_height is not None:
-                lidar_hgt_msg = Float64()
-                lidar_hgt_msg.data = self.uav.lidar_height / 100.0
-                self.lidar_height_pub.publish(lidar_hgt_msg)
-            time.sleep(1.0/self.fcu_pub_fps)
-            # rate.sleep()
-        print("UAV 结束1")
+            # angular
+            vel_msg.twist.angular.x = self.uav.imu_gyro[0]
+            vel_msg.twist.angular.y = self.uav.imu_gyro[1]
+            vel_msg.twist.angular.z = self.uav.imu_gyro[2]
+            self.velocity_pub.publish(vel_msg)
+        
+        
+        # pub lidar-height
+        if should_pub_lidar_height and self.uav.lidar_height is not None:
+            lidar_hgt_msg = Float64()
+            lidar_hgt_msg.data = self.uav.lidar_height / 100.0
+            self.lidar_height_pub.publish(lidar_hgt_msg)
+        # time.sleep(1.0/self.fcu_pub_fps)
+        # rate.sleep()
+        # print("UAV 结束1")
 
 def main(args=None):
     rclpy.init()

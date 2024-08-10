@@ -78,6 +78,7 @@ class UAVOnBoard:
         # flags
         self.pos_got_ever = False
         self.takeoff_confirm_without_position = False
+        self.is_armed = False
         self.ctrl_block_flag = True  # 用于其他任务暂停起飞和降落的标志, True: 可以持续运行，False: 立刻截止当前任务
         # connection
         self.fcu_master = None
@@ -714,6 +715,7 @@ class UAVOnBoard:
                     last_print_time = time.time()
                     # print(msg.get_type())
                 if msg_type == 'HEARTBEAT':
+                    self.is_armed = msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
                     if should_print:
                         print('heart beat')
                 if msg_type == 'LOCAL_POSITION_NED':

@@ -19,15 +19,12 @@ begin_task(){
     if [ $? -eq 0 ]; then
         echo ">>> $target_ip is reachable, proceeding with SCP and SSH"
         
-        # 将打包好的文件传输到目标机器
-        sshpass -p 'cat' scp ws_comp29.tar.gz cat@$target_ip:~/
-        
         # 通过SSH登录并删除原有文件夹，解压新文件
         sshpass -p 'cat' ssh cat@$target_ip << EOF
-        source ~/.bashrc
-        bash ./ws_comp29/src/scripts/comp29run.sh
-        echo ">>> $target_ip: Done."
-        exit
+source ~/.bashrc
+bash ./ws_comp29/src/scripts/comp29run.sh
+echo ">>> $target_ip: Done."
+exit
 EOF
         echo -e ">>> ${GREEN} TARGET $target_ip COMPLETED.${NC}"
     else
@@ -39,7 +36,7 @@ EOF
 for i in {202..202}; do
     IP="192.168.151.$i"
     IP="192.168.151.202"
-    echo ">>> Trying to deploy on ${GREEN} $target_ip ${NC}"
+    echo -e ">>> Trying to deploy on ${GREEN} $target_ip ${NC}"
     begin_task $IP
     
 done

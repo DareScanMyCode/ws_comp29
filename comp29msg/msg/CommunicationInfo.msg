@@ -5,6 +5,8 @@ std_msgs/Header header
 
 #
 UAVInfo[] uav
+#
+std_msgs/Float32MultiArray dist_mat
 # 目标位置
 std_msgs/Float32MultiArray tracking_list        # 单行表示所有
 # 哪个目标由哪架飞机守着

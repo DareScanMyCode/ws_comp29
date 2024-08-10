@@ -50,7 +50,9 @@ class AngleLeader:
         self.tgt_pos = tgt_pos if isinstance(tgt_pos, np.ndarray) else np.array(tgt_pos)
         self.tgt_pos_local = self.tgt_pos-self.tgt_pos[self.index_id]
         self.tgt_dist = np.linalg.norm(self.tgt_pos_local, axis=1)
+        # print(self.tgt_dist)
         self.leader_index_id = leader_index_id
+        # print(self.leader_index_id)
         self.k_dist = k_dist
         self.k_img  = k_img
         self.dist_only_agent = Follower(self.index_id, self.adj_mtx, self.tgt_pos, self.k_dist)
@@ -76,6 +78,7 @@ class AngleLeader:
             # 此处假设要让leader在自己的正前方，即dist控制前后，dx控制左右，
             # dist err 为正，距离过近，速度向后
             vf = - self.k_dist * leader_dist_err
+            # print(f"[1111] dist_err={leader_dist_err}")
             # dx为正，leader在左边！（dx为期望像素坐标-img中leader的像素坐标），左上角为零，向左
             if math.fabs(dx) < 30:
                 vr = 0.0

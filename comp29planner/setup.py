@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/comp29launch_all.py']),
+        ('share/' + package_name + '/launch', ['launch/comp29test_form.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

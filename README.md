@@ -20,3 +20,6 @@
         - UAV_configs：151网段配置文件
         - UAV_configs：136（自组网）网段配置文件
     - weights：存放权重文件
+# Important
+- 执行setup命令之后会覆盖原有文件！
+- 必须注意相机的安装角度！

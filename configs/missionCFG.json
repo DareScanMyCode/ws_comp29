@@ -1,14 +1,23 @@
 {
-    "discription": "比赛中的一些参数设置",
+    "map_discription": "地图参数设置",
     "MAP_W": 50,
     "MAP_L": 100,
     "MAP_ANGLE": 0,
+
+    "Formation_discription": "无人机集群设置",
     "NUM_UAV": 4,
     "LEADER_ID": 1,
     "ANGLE_LEADER_ID": 2,
+    "HERIZON_space": 3.0,
     
     "GROUP_1": [1, 2, 3],
     "GROUP_2": [4, 5, 6],
-    "GROUP_3": [7, 8]
+    "GROUP_3": [7, 8],
+
+    "UAV_discription": "无人机参数设置",
+    "UAV_SPEED": 2.0,
+    "UAV_MAX_SPEED": 2.5,
+    "FLIGHT_HEIGHT": 2.5,
+    "MIN_DIST": 0.5
 
 }
