@@ -99,8 +99,7 @@ rm -rf ~/ws_comp29/src
 tar -xzf ~/ws_comp29_src.tar.gz -C ~/ws_comp29/
 # rm ~/ws_comp29_src.tar.gz
 # version_local=$(cat ~/ws_comp29/src/scripts/version.txt)
-echo "<<< CODE VERSION on ${target_ip} is:"
-echo "<<< $(cat ~/ws_comp29/src/scripts/version.txt)"
+echo -e "<<< CODE VERSION on ${target_ip} is: \033[32m $(cat ~/ws_comp29/src/scripts/version.txt) \033[0m"
 echo "<<< $target_ip: Done."
 exit
 EOF
@@ -110,8 +109,7 @@ rm -rf ~/ws_comp29/src
 tar -xzf ~/ws_comp29_src.tar.gz -C ~/ws_comp29/
 # rm ~/ws_comp29_src.tar.gz
 # version_local=$(cat ~/ws_comp29/src/scripts/version.txt)
-echo "<<< CODE VERSION on ${target_ip} is:"
-echo "<<< $(cat ~/ws_comp29/src/scripts/version.txt)"
+echo -e "<<< CODE VERSION on ${target_ip} is: \033[34m $(cat ~/ws_comp29/src/scripts/version.txt) \033[0m"
 echo "<<< $target_ip: Done."
 exit
 EOF

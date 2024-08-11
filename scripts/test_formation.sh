@@ -27,7 +27,7 @@ fi
 
 # 设置ros2的logger格式
 export RCUTILS_LOGGING_BUFFERED_STREAM=1
-export RCUTILS_CONSOLE_OUTPUT_FORMAT="{node_name} [{severity}] [{time}]: {message}"
+export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}]: {message}"
 
 # 重新加载 .bashrc 以应用更改
 # source ~/.bashrc
