@@ -22,7 +22,7 @@ def JudgeQuadrant(axis_x,axis_y):
 
     
 class LandController():
-    def __init__(self, land_pos:Literal['left_top', 'right_top', 'bottom', 'central']='central', k_img=0.5, land_spd = 0.15, threshold=0.1):
+    def __init__(self, land_pos:Literal['left_top', 'right_top', 'bottom', 'central']='central', k_img=1.0, land_spd = 0.15, threshold=0.1):
         self.k_img = k_img  
         self.land_spd = land_spd
         self.threshold = threshold
@@ -31,7 +31,7 @@ class LandController():
         self.dy = 0.
         self.Quadrant = 0
         self.land_pos = land_pos
-        self.min_height = 1
+        self.min_height = 0.9
         
         # TODO 根据land_pos来设定停机位置
         if self.land_pos == 'left_top':
@@ -56,21 +56,22 @@ class LandController():
         # 对准就降
         if abs(num_x - self.tgt_num_pos_img[0]) < self.threshold and abs(num_y - self.tgt_num_pos_img[1]) < self.threshold:
             # self.final_land_flag = True
-            print("已经对准目标")
-            return [0.0, 0.0, self.land_spd]
-        # 没对准但高度很低也降
+            # print("已经对准目标")
+            return [0.0, 0.0, self.land_spd], False
+        # 没对准但高度很低也降 虽然现在能识别 但可能再低就不行了
         if height <= self.min_height:
-            return [0.0, 0.0, self.land_spd]
+            return [0.0, 0.0, self.land_spd], True
         # 否则调整位置
         x_err = self.tgt_num_pos_img[0] - num_x
         y_err = self.tgt_num_pos_img[1] - num_y
         
-        vel_set_frd_x = self.k_img * x_err
-        vel_set_frd_y = self.k_img * y_err
+        # vel_set_frd_x = self.k_img * x_err
+        # vel_set_frd_y = self.k_img * y_err
+        vel_set_frd_x = self.k_img * y_err
+        vel_set_frd_y = self.k_img * -x_err
         vel_set_frd_z = 0.0
 
-        return [vel_set_frd_x, vel_set_frd_y, vel_set_frd_z]
-
+        return [vel_set_frd_x, vel_set_frd_y, vel_set_frd_z], False
 
 class LandControllerNode(Node):
     def __init__(self, args=None):

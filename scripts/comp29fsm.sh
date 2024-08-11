@@ -35,10 +35,8 @@ check_and_set_env() {
     local env_var_value=$(eval echo \$$env_var_name)
 
     if [ -z "$env_var_value" ]; then
-        read -p ">>> ${YELLOW}环境变量 $env_var_name 未设置，请输入值: ${NC}" env_var_value
-        echo -e "export $env_var_name=$env_var_value" >> ~/.bashrc
-        export $env_var_name=$env_var_value
-        echo -e ">>> ${YELLOW}$env_var_name 设置为 $env_var_value 并已写入 .bashrc"
+        echo -e ">>> ${RED}环境变量 $env_var_name 未设置，请在~/.bashrc中设置: ${NC}"
+        echo -e "echo \"export $env_var_name=xxx\" >> ~/.bashrc"
     else
         echo -e "$env_var_name 当前值为 ${GREEN} $env_var_value ${NC}"
     fi
@@ -63,12 +61,15 @@ export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}]: {message}"
 
 echo ">>> ROS 2 日志格式已设置为仅包括节点名称、时间和消息类型。"
 
-export DISPLAY=:0
 echo ">>> 构建与source"
-cd ~/ws_comp29
-colcon build
+if [ "$BUILD_FLAG" = true ]; then
+    echo -e ">>> ${YELLOW}Compiling...${NC}"
+    cd ~/ws_comp29
+    colcon build
+fi
 
+export DISPLAY=:0
+
+echo ">>>启动主节点"
 source ~/ws_comp29/install/setup.bash
-
-echo ">>>启动硬件节点"
-ros2 launch comp29planner comp29launch_all.py
+ros2 launch comp29planner comp29test_fsm.py

@@ -147,7 +147,7 @@ class Uav2ROSNode(Node):
                 
     def vel_set_frd_cb(self, msg: TwistStamped):
         self.last_vel_cmd_got_time = time.time()
-        self.get_logger().info("got frd vel msg")
+        # self.get_logger().info("got frd vel msg")
         # self.uav.uav_send_speed_FRD(msg.twist.linear.x,
         #                             msg.twist.linear.y,
         #                             msg.twist.linear.z)

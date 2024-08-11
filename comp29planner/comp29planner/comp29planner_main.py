@@ -25,6 +25,8 @@ from geometry_msgs.msg      import TwistStamped, Vector3
 from std_msgs.msg           import Int64, Float64, Bool, Float32
 from comp29msg.msg          import CommunicationInfo, DetectionResult, DetectionArray, UAVInfo
 
+from sensor_msgs.msg import Imu
+
 class MovingAverageFilter:
     def __init__(self, window_size=10):
         self.window_size = window_size
@@ -48,21 +50,29 @@ class MovingAverageFilter:
         return sum(self.data) / len(self.data) if len(self.data) != 0 else 0
 
 TARGET_POS_LOCAL = np.array([
-    [1.6, 4.2],
-    [1.6, 2.0],
-    [ 0.,  0.],
-    [3.2, 0.],
+    [1.6,    4.2],
+    [1.6,    2.0],
+    [ 0.,    1.2],
+    [3.2,    1.2],
 ], dtype=np.float64)
 
 """
        1
      / | \
-    /  |  \
-   /   2   \
-  /  /   \  \
- //         \\
-3-------------4
+   /   |   \
+ /     |     \
+3------2-------4
+"""
 
+"""
+       1
+     / | \
+   /   |  \
+ /     |   \
+3------2    \
+         -\  \
+            -\\
+               4 
 """
 ADJ_MTX = np.array([
 #    1  2  3  4
@@ -95,6 +105,8 @@ class Comp29MainNode(Node):
             self.map_w              = self.mis_cfg['MAP_W']
             self.map_l              = self.mis_cfg['MAP_L']
             self.map_angle          = self.mis_cfg['MAP_ANGLE']
+            self.dx_per_line        = self.mis_cfg['DX_PER_LINE']
+            
             self.leader_id          = self.mis_cfg['LEADER_ID']
             self.angle_leader_id    = self.mis_cfg['ANGLE_LEADER_ID']
             self.num_uav            = self.mis_cfg['NUM_UAV']
@@ -134,12 +146,13 @@ class Comp29MainNode(Node):
         self.dist = None
         self.dist_got = False
         
-        self.group = None
-        self.group_got = False
+        self.group_got = True
         
         self.vel = [0., 0., 0.]
         
         self.lidar_height = None
+        self.imu_data=Node
+        self.rpy=[0.0,0.0,0.0]
         
         self.arm_state = False
         
@@ -147,7 +160,8 @@ class Comp29MainNode(Node):
         
         self.number_detected_state = False
         self.detected_got_time = None
-        
+        self.local_pos_fcu = None
+        self.local_pos_est = None
         self.local_pos_int = [0,0]
         self.local_pos_dists = []
         self.dists = None
@@ -181,6 +195,8 @@ class Comp29MainNode(Node):
         self.land_ctrler = LandController()
         self.final_land_flag = False
         
+        # leader巡航配置
+        self.direc = self.DIR_FRONT
         # 消息控制
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,  # 设置可靠性为RELIABLE
@@ -192,6 +208,7 @@ class Comp29MainNode(Node):
         self.vel_frd_pub            = self.create_publisher(TwistStamped,   '/vel_set_frd', qos_profile)
         self.vel_ned_pub            = self.create_publisher(TwistStamped,   '/vel_set_ned', qos_profile)
         self.arm_cmd_pub            = self.create_publisher(Bool,           '/arm',         qos_profile)
+        self.gimbal_pub             = self.create_publisher(PoseStamped,    '/gimbalrpy_setpoint', qos_profile)
         
         # 创建订阅者
         comm_topic_name = '/uav' + str(self.uav_id) + '/comm_info'
@@ -240,12 +257,18 @@ class Comp29MainNode(Node):
         )
         
         self.lidar_height_sub   = self.create_subscription(
-            Float32, 
+            Float64, 
             '/lidar_height', 
             self.lidar_cb, 
             qos_profile
         )
         
+        self.imu_sub=self.create_subscription(
+            Imu,
+            '/imu',
+            self.imu_cb,
+            qos_profile
+        )
         
         # color部分
         self.color_dx = 0.
@@ -263,10 +286,40 @@ class Comp29MainNode(Node):
         
         
         # 信号监视器
-        self.SIGNAL_LOST_TIME = 0.4
+        self.SIGNAL_LOST_TIME = 0.45
         self.watch_timer = self.create_timer(0.2, self.watch)
+        self.timer_1s    = self.create_timer(1.0, self.timer_1s_cb)
+        self.get_logger().info(f"{color_codes['green']}主程序准备好了{color_codes['reset']}")
+    
+    def timer_1s_cb(self):
+        """
+        1s运行一次
+        """
+        self.gimbal_ctrl()
         
-        self.get_logger().info(f"{color_codes['green']}主控制器准备好了{color_codes['reset']}")
+    def gimbal_ctrl(self):
+        """
+        1s运行一次
+        对于angle leader，云台向前
+        对于其他，云台向下，pitch为90度
+        """
+        gim_msg = PoseStamped()
+        if self.formation_role == AgentRole.ROLE_FORMATION_ANGLE_LEADER:
+            gim_msg.header.stamp = self.get_clock().now().to_msg()
+            if self.mission_state == MissionState.MIS_FORMATION:
+                gim_msg.pose.position.x = 0.0
+                gim_msg.pose.position.y = 0.0
+                gim_msg.pose.position.z = 0.0
+            else:
+                gim_msg.pose.position.x = 0.0
+                gim_msg.pose.position.y = -90.0
+                gim_msg.pose.position.z = 0.0
+        else:
+            gim_msg.header.stamp = self.get_clock().now().to_msg()
+            gim_msg.pose.position.x = 0.0
+            gim_msg.pose.position.y = -90.0
+            gim_msg.pose.position.z = 0.0
+        self.gimbal_pub.publish(gim_msg)
         
     def watch(self):
         """
@@ -331,10 +384,19 @@ class Comp29MainNode(Node):
     def local_pos_est_cb(self, msg):
         pass
     
-    def lidar_cb(self, msg:Float32):
+    def lidar_cb(self, msg:Float64):
         # return
         self.lidar_height = float(msg.data)
-        
+    
+    def imu_cb(self,msg):
+        self.imu_data=msg
+        q = Quaternion(w=self.imu_data.orientation.w, x=self.imu_data.orientation.x, y=self.imu_data.orientation.y, z=self.imu_data.orientation.z)
+        euler=q.get_euler()
+        self.rpy=euler
+        # self.get_logger().info(
+        #         f"rpy:{self.rpy[0] :6.2f} {self.rpy[1] :6.2f} {self.rpy[2] :6.2f} "
+        #     )     
+    
     def comm_info_cb(self, msg: CommunicationInfo):
         # TODO 测试！
         for uav_info in msg.uav:
@@ -344,13 +406,13 @@ class Comp29MainNode(Node):
         self.guard_list = msg.guard_list.data
         # TODO 更新本机变量
         
-    
     def number_detected_cb(self, msg: DetectionResult):
-        # self.number_detected_state = True
+        self.number_detected_state = True
         # print(111)
-        self.detected_result.msg2result(msg)
+        self.detected_result.detected_pose = [msg.position.x,msg.position.y]
+        self.detected_result.detected_num = int(msg.object_name.data)
+
         self.detected_got_time = time.time()
-        pass
     
     def color_dx_cb(self, msg:Vector3):
         self.color_dx = msg.x
@@ -365,20 +427,56 @@ class Comp29MainNode(Node):
     def dist_cb(self, msg:Float32MultiArray):
         self.dists = msg.data[self.uav_id*msg.layout.dim[0].size+1:self.uav_id*msg.layout.dim[0].size+self.num_uav+1]
         self.dist_got = True
-        self.logger.info(f"{self.uav_id}: {self.uav_id*msg.layout.dim[0].size+1}, {self.uav_id*msg.layout.dim[0].size+self.num_uav+1}")
+        # self.logger.info(f"{self.uav_id}: {self.uav_id*msg.layout.dim[0].size+1}, {self.uav_id*msg.layout.dim[0].size+self.num_uav+1}")
     
     def local_pos_cb(self, msg: PoseStamped):
         self.local_pos = [msg.pose.position.x, msg.pose.position.y]
         self.pos_got = True
     
+    DIR_FRONT   = 1
+    DIR_BACK    = 2
+    DIR_RIGHT   = 3
+    DIR_LEFT    = 4
+    
     def leader_ctrl(self):
         """
+        Y
+        |
+        ----X
         Leader 控制，负责绕圈圈
         往前 直到 y = self.map_l
         往右 10m
         向后 直到 y = 5m
         """
-        pass
+        if self.local_pos_est is None:
+            self.logger.info(f"[LEADER] local pos est is None")
+            return [0., 0., 0.]
+        if self.direc == self.DIR_FRONT:
+            if self.local_pos_est[1] < self.map_l:
+                return [self.uav_speed, 0., 0.]
+            else:
+                # 准备往右，记录现在的x
+                self.direc = self.DIR_RIGHT
+                self.right_begin_x = self.local_pos_est[0]
+                return [0., 0., 0.]
+        elif self.direc == self.DIR_RIGHT:
+            if self.local_pos_est[0] < self.right_begin_x + self.dx_per_line:
+                # 往右
+                return [0., self.uav_speed, 0.]
+            else:
+                # 往后
+                self.direc = self.DIR_BACK
+                return [0., 0., 0.]
+        elif self.direc == self.DIR_BACK:
+            # 往后知道y=4
+            if self.local_pos_est[1] > 4.0:
+                return [-self.uav_speed, 0., 0.]
+            else:
+                # 往右
+                self.right_begin_x = self.local_pos_est[0]
+                self.direc = self.DIR_RIGHT
+                return [0., 0., 0.]
+        return [0., 0., 0.]
     
     def formation_ctrl(self):
         """
@@ -397,33 +495,46 @@ class Comp29MainNode(Node):
             # Follower
             vv_frd = self.form_ctrler.get_ctrl(self.dists)
         self.logger.debug(f"[FORM] vv_frd: {vv_frd[0]}, {vv_frd[1]}")
-        return vv_frd
+        return [vv_frd[0], vv_frd[1], 0.0]
     
     def land_ctrl(self):
+        # print("detect_num", self.detected_result.detected_num)
+        # print("detect_pose",self.detected_result.detected_pose)
         """
         降落控制
         """
         # 应该先飞到目标位置与高度，然后直接降落，需要一个flag
         vv_frd = [0., 0., 0.]
-        if self.final_land_flag:
-            self.logger.debug(f"[LAND] final land flag is True")
-            vv_frd = [0., 0., 0.15]
-            return vv_frd
-        else:
-            if self.number_detected_state:
-                if self.detected_result.detected_num == self.group:
-                    # TODO 确认pose
-                    vv_frd = self.land_ctrler.land_ctrl(self.detected_result.detected_pose[0], self.detected_result.detected_pose[1])
-                    self.logger.debug(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
+        # print(self.number_detected_state)
+        # print(self.detected_result.detected_num)
+        # print(self.group)
+        if self.lidar_height is not None:
+            if self.lidar_height >= 0.2:
+                if self.final_land_flag:
+                    self.logger.debug(f"[LAND] final land flag is True")
+                    vv_frd = [0., 0., 0.15]
                     return vv_frd
                 else:
-                    self.logger.debug(f"[LAND] 检测到目标{self.detected_result.detected_num}，但不是目标{self.group}")
-                    return vv_frd
+                    if self.number_detected_state:
+                        if self.detected_result.detected_num == self.group:
+                            # TODO 确认pose
+                            # self.get_logger().info(f"detected_pose:{self.detected_result.detected_pose[0], self.detected_result.detected_pose[1]}  ")
+                            vv_frd, final_land_flag = self.land_ctrler.land_ctrl(self.detected_result.detected_pose[0], self.detected_result.detected_pose[1], self.lidar_height)
+                            # 只要开始final_land 之后即便识别到也不管
+                            self.final_land_flag = self.final_land_flag or final_land_flag
+                            self.logger.debug(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
+                            return vv_frd
+                        else:
+                            self.logger.debug(f"[LAND] 检测到目标{self.detected_result.detected_num}，但不是目标{self.group}")
+                            return vv_frd
+                    else:
+                        self.logger.debug(f"未检测到目标")
+                        # TODO 附近瞎逛或者离检测到的飞机近一点
+                        return vv_frd
             else:
-                self.logger.debug(f"未检测到目标")
-                # TODO 附近瞎逛或者离检测到的飞机近一点
-                return vv_frd
-        pass
+                return [0,0,1]
+        else:
+            return vv_frd
     
     def rend_ctrl(self):
         """
@@ -434,6 +545,7 @@ class Comp29MainNode(Node):
         if self.dists[self.landmark_uav_id] > 5.:
             # TODO 应该是距离估计比较准之后切换
             # 使用之前的估计位置
+            
             pass
         else:
             # 使用rendezvous方法
@@ -469,16 +581,17 @@ class Comp29MainNode(Node):
         MAX_SPD = 0.3
         MIN_SPD = 0.02
         MIN_DIST = 1.1
-        self.mission_state = MissionState.MIS_FORMATION_FOLLOW
+        
+        # self.mission_state = MissionState.MIS_LANDING
+        self.mission_state = MissionState.MIS_FORMATION
+        # self.mission_state = MissionState.MIS_WAIT
         while rclpy.ok():
             rclpy.spin_once(self)
+            vv_frd = [0.0, 0.0, 0.0]
             # 根据状态执行任务
             if self.mission_state == MissionState.MIS_WAIT:
                 pass
-            elif self.mission_state == MissionState.MIS_FORMATION_LEADER:
-                pass
-            elif self.mission_state == MissionState.MIS_FORMATION_FOLLOW:
-                
+            elif self.mission_state == MissionState.MIS_FORMATION:
                 vv_frd = self.formation_ctrl()
                 pass
             elif self.mission_state == MissionState.MIS_FORMATION_LEAVING:
@@ -492,24 +605,33 @@ class Comp29MainNode(Node):
             elif self.mission_state == MissionState.MIS_TARGET_WATCHING:
                 pass
             elif self.mission_state == MissionState.MIS_LANDING:
+                vv_frd = self.land_ctrl()
                 pass
             
+            # 速度输出
+            # vv = [vv_frd[0], vv_frd[1], 0.0] if len(vv_frd)==2 else vv_frd
             vv = vv_frd if isinstance(vv_frd, np.ndarray) else np.array(vv_frd)
             vv = vv if np.linalg.norm(vv) < MAX_SPD else vv*MAX_SPD/np.linalg.norm(vv)
             vv[0] = self.vel_set_x_filter.get_value(vv[0])
             vv[1] = self.vel_set_y_filter.get_value(vv[1])
+            vv[2] = vv[2]
             
-            vz = self.height_ctrler.get_ctrl(self.lidar_height)
+            # vv[2]=0.0
+            if self.lidar_height is not None and self.mission_state != MissionState.MIS_LANDING:
+                vv[2] = self.height_ctrler.get_ctrl(self.lidar_height,self.rpy)
+            #     # self.get_logger().info(
+            #     #     f"vz:{vv[2]}  "
+            #     # )
             
             vel_frd_msg = TwistStamped()
             vel_frd_msg.twist.linear.x = vv[0] if math.fabs(vv[0]) > MIN_SPD else 0.0
             vel_frd_msg.twist.linear.y = vv[1] if math.fabs(vv[1]) > MIN_SPD else 0.0
-            vel_frd_msg.twist.linear.z = vz
+            vel_frd_msg.twist.linear.z = vv[2] 
             
             
             self.get_logger().info(
                 f"d:{self.dists[0] :6.2f} {self.dists[1] :6.2f} {self.dists[2] :6.2f} {self.dists[3] :6.2f} == " + 
-                f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}"
+                f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}, {vv[2]:4.2f} ; h:{self.lidar_height} "
             )
             self.vel_frd_pub.publish(vel_frd_msg)
             # rclpy.spin_once(self)

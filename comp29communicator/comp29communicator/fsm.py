@@ -404,26 +404,40 @@ class fsm():
 
         if data_t['frame_id'] == 1:
             #
+            unpack_1_end = 8
+            #
             unpack_format_t_2 = "Bfff"
+            unpack_2_end = unpack_1_end + 13
             for i in range(0, self.swarm_num):
                 unpack_format_t_2 = unpack_format_t_2 + "f"
+                unpack_2_end = unpack_2_end + 4
             #
-            unpack_format_t_3 = str()
+            unpack_format_t_3 = ""
+            unpack_3_end = unpack_2_end
             for i in range(0, self.swarm_num):
                 unpack_format_t_3 = unpack_format_t_3 + "B"
+                unpack_3_end = unpack_3_end + 1
             unpack_format_t_3 = unpack_format_t_3 + "fff"
             unpack_format_t_3 = unpack_format_t_3 + "ffff"
+            unpack_3_end = unpack_3_end + 7 * 4
             #
-            unpack_format_t_4 = str()
+            unpack_format_t_4 = ""
             for i in range(0, self.known_target_num):
                 unpack_format_t_4 = unpack_format_t_4 + "bff"
             for i in range(0, self.known_target_num):
                 unpack_format_t_4 = unpack_format_t_4 + "bb"
             unpack_format_t_4 = unpack_format_t_4 + 'bb'
-
-            unpacked_2 = struct.unpack(unpack_format_t_2, data_received[6:54])  # 这个6是试出来的, 不要问我咋知道的, TODO, check correctness! 如果错了则改回unpack_format_t_1 = "BBBIBB", unpack_format_t_2 = "fff"
-            unpacked_3 = struct.unpack(unpack_format_t_3, data_received[54:90])
-            unpacked_4 = struct.unpack(unpack_format_t_4, data_received[90:])
+            # print(unpack_format_t_2)
+            # print(unpack_format_t_3)
+            # print(unpack_format_t_4)
+            # print(unpack_1_end)
+            # print(unpack_2_end)
+            # print(unpack_3_end)
+            # print(unpack_4_end)
+            
+            unpacked_2 = struct.unpack(unpack_format_t_2, data_received[unpack_1_end:unpack_2_end])  # 这个6是试出来的, 不要问我咋知道的, TODO, check correctness! 如果错了则改回unpack_format_t_1 = "BBBIBB", unpack_format_t_2 = "fff"
+            unpacked_3 = struct.unpack(unpack_format_t_3, data_received[unpack_2_end:unpack_3_end])
+            unpacked_4 = struct.unpack(unpack_format_t_4, data_received[unpack_3_end:])
 
             #
             data_t['group_id']  = unpacked_2[0]

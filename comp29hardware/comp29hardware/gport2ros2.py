@@ -12,7 +12,7 @@ class Gimbal2ROSNode(Node):
         print(args)
         # 获取参数
         self.gimbal_port = self.declare_parameter('gimbal_port', '/dev/ttyS7').get_parameter_value().string_value
-        self.gimbal_pub_fps = self.declare_parameter('gimbal_pub_fps', 20).get_parameter_value().integer_value
+        self.gimbal_pub_fps = self.declare_parameter('gimbal_pub_fps', 5).get_parameter_value().integer_value
         self.gimbal_rpy_pub = self.create_publisher(PoseStamped, 'gimbalrpy_data', 10)
         self.gimbal_imu_rpy_pub = self.create_publisher(PoseStamped, 'gimbalimu_data', 10)
 

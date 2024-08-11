@@ -3,6 +3,7 @@
     "MAP_W": 10,
     "MAP_L": 50,
     "MAP_ANGLE": 0,
+    "DX_PER_LINE": 4,
 
     "Formation_discription": "无人机集群设置",
     "NUM_UAV": 4,
@@ -17,7 +18,7 @@
     "UAV_discription": "无人机参数设置",
     "UAV_SPEED": 2.0,
     "UAV_MAX_SPEED": 2.5,
-    "FLIGHT_HEIGHT": 2.5,
+    "FLIGHT_HEIGHT": 0.9,
     "MIN_DIST": 0.5,
 
     "POS_discription": "无人机初始位置，坐标系为xxx",
@@ -30,6 +31,8 @@
         "UAV6": [0.0, 0.0],
         "UAV7": [0.0, 0.0],
         "UAV8": [0.0, 0.0]
-    }
+    },
+    "COMM_PORT": 25001,
+    "TARGET_NUM": 3
 
 }

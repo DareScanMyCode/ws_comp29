@@ -389,13 +389,56 @@ def main(args=None):
     
     if is_debugging:
         node.get_logger().info(f"{comm_table_t}")
+
+    # 参数
+    uav_id = int(os.environ.get('UAV_ID', '-1'))
+    if uav_id == -1:
+        node.get_logger().warn("[fsm] UAV_ID未被设置！！！！")
+    username = os.environ.get("USER", 'cat')
+    filepath = f'/home/{username}/ws_comp29/src/configs/missionCFG.json'
+    # 读取任务配置文件
+    if not os.path.exists(filepath):
+        node.get_logger().error(f"[fsm] Config file {filepath} does not exist.")
+        return None
+    # 打开并读取 JSON 文件
+    import json
+    try:
+        with open(filepath, 'r') as file:
+            mis_cfg = json.load(file)
+        node.get_logger().info(f"Config file {filepath} loaded successfully.")
+    except Exception as e:
+        node.get_logger().error(f"Failed to read config file: {e}")
     
-    uav_id    = int(os.getenv("UAV_ID", comm_table_t['uav_id']))
-    # TODO 写死或者从config.missionCFG.json读取
-    uav_group_id  = comm_table_t['group_id']
-    swarm_num = comm_table_t['swarm_num']
-    known_target_num = comm_table_t['known_tgt_num']
-    port = comm_table_t['port']
+    if mis_cfg is not None:
+        map_w              = mis_cfg['MAP_W']
+        map_l              = mis_cfg['MAP_L']
+        map_angle          = mis_cfg['MAP_ANGLE']
+        dx_per_line        = mis_cfg['DX_PER_LINE']
+        
+        leader_id          = mis_cfg['LEADER_ID']
+        angle_leader_id    = mis_cfg['ANGLE_LEADER_ID']
+        swarm_num            = mis_cfg['NUM_UAV']
+        
+        group_1            = mis_cfg['GROUP_1']
+        group_2            = mis_cfg['GROUP_2']
+        group_3            = mis_cfg['GROUP_3']
+        
+        uav_group_id = 1 if uav_id in group_1 else 2 if uav_id in group_2 else 3 if uav_id in group_3 else -1
+        
+        if uav_group_id == -1:
+            node.get_logger().warn("[fsm] UAV_ID未被分组！！！！")
+            
+        port = mis_cfg['COMM_PORT']
+        known_target_num = mis_cfg['TARGET_NUM']
+            
+    else:
+        node.get_logger().warn("[fsm] 未能读取到任务配置文件！！！！")
+        
+        
+    # uav_group_id  = comm_table_t['group_id']
+    # swarm_num = comm_table_t['swarm_num']
+    # known_target_num = comm_table_t['known_tgt_num']
+    # port = comm_table_t['port']
     for i in range(0, comm_table_t['target_ip'].__len__()):
         ip_t = comm_table_t['target_ip'][i]
         #if ip_t == comm_table_t['self_ip'] and not is_debugging:
