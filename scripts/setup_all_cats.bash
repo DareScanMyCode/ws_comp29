@@ -46,7 +46,7 @@ echo ">>> Trying to pack the directory ~/ws_comp29/src"
 cd ~/
 if [ -d "ws_comp29" ]; then
     # 打包文件夹
-    tar -czf ws_comp29_src.tar.gz -C ~/ws_comp29/ src
+    tar --exclude='src/.git' -czf ws_comp29_src.tar.gz -C ~/ws_comp29/ src
 else
     echo -e ">>> ${RED}Directory ~/ws_comp29 does not exist.${NC}"
     exit 1
@@ -121,7 +121,7 @@ EOF
 }
 
 # 目标IP地址范围
-for i in {202..203}; do
+for i in {203..204}; do
     IP="192.168.151.$i"
     # IP="192.168.151.202"
     echo -e ">>> Trying to deploy on ${YELLOW}$IP ${NC}"

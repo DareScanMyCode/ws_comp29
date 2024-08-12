@@ -41,4 +41,4 @@ source ~/ws_comp29/install/setup.bash
 
 export DISPLAY=:0
 # ros2 run comp29planner test_formation
-ros2 launch comp29planner comp29test_form.py
+ros2 launch comp29planner comp29test_form_leaving.py

@@ -56,6 +56,8 @@ TARGET_POS_LOCAL = np.array([
     [3.2,    1.2],
 ], dtype=np.float64)
 
+LEAVING_ID = []
+
 """
        1
      / | \
@@ -138,9 +140,11 @@ class Comp29MainNode(Node):
             self.formation_role = AgentRole.ROLE_FORMATION_FOLLOWER
             
         # 变量
+        self.mission_began = False
+        self.mission_ready = False
         self.mission_state = MissionState.MIS_WAIT
         
-        self.local_pos_est = None
+        self.local_pos_est = [0., 0.]
         self.local_pos_est_got = False
         
         self.dist = None
@@ -220,6 +224,13 @@ class Comp29MainNode(Node):
             qos_profile
         )
         
+        self.local_position_ned_fcu_sub   = self.create_subscription(
+            PoseStamped,
+            '/local_position_ned',
+            self.fcu_pos_cb,
+            qos_profile
+        )
+        
         self.local_position_ned_est_sub        = self.create_subscription(
             PoseStamped, 
             '/local_position_ned_est',  
@@ -267,6 +278,13 @@ class Comp29MainNode(Node):
             Imu,
             '/imu',
             self.imu_cb,
+            qos_profile
+        )
+        
+        self.mis_sta_sub = self.create_subscription(
+            Int64,
+            '/mission_state',
+            self.mis_sta_cb,
             qos_profile
         )
         
@@ -380,8 +398,49 @@ class Comp29MainNode(Node):
             else:
                 self.logger.info(f"{key}: {value}")
         self.logger.info(f">>> {color_codes['green']}MISSION CONFIG READ{color_codes['reset']}")
+    
+    K_GOTO = 0.5
+    def goto_pos_NED(self, x, y, height):
+        # 注意坐标系！
+        vv_ned = [0.0, 0.0, 0.0]
+        if self.local_pos_est is not None:
+            vv_ned[0] = self.K_GOTO * (x - self.local_pos_est[0])
+            self.height_ctrler.tgt_height = height
+        else:
+            self.logger.info(f"[MAIN] local pos est is None")
+        return vv_ned
+    
+    GOTO_POS_ERR  = 0.4
+    def goto_pose_ready(self, x, y, z=None):
+        if abs(x - self.local_pos_est[0]) > self.GOTO_POS_ERR:
+            return False
+        if abs(y - self.local_pos_est[1]) > self.GOTO_POS_ERR:
+            return False
+            
         
-    def local_pos_est_cb(self, msg):
+    def mis_sta_cb(self, msg:Int64):
+        if msg.data == MissionState.MIS_END:
+            self.mission_state = MissionState.MIS_END
+            self.logger.info(f"[MAIN] got MISSION {ColorCodes.yellow}END END END{ColorCodes.reset}")
+        elif msg.data == MissionState.MIS_STOP:
+            self.mission_state = MissionState.MIS_STOP
+            self.logger.info(f"[MAIN] got MISSION {ColorCodes.red}STOP STOP STOP{ColorCodes.reset}")
+        elif msg.data == MissionState.MIS_READY and self.mission_ready:
+            self.mission_ready = True
+            self.mission_state = MissionState.MIS_READY
+            self.logger.info(f"[MAIN] got MISSION {ColorCodes.red}READY READY READY{ColorCodes.reset}")
+        elif msg.data == MissionState.MIS_BEGIN and not self.mission_began:
+            self.mission_state = MissionState.MIS_BEGIN
+            self.mission_began = True
+            self.logger.info(f"[MAIN] {ColorCodes.green}任务开始{ColorCodes.reset}")
+
+    def fcu_pos_cb(self, msg:PoseStamped):
+        self.local_pos_fcu = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        # TODO 删掉
+        self.local_pos_est = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        
+    def local_pos_est_cb(self, msg: PoseStamped):
+        self.local_pos_est = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
         pass
     
     def lidar_cb(self, msg:Float64):
@@ -399,12 +458,49 @@ class Comp29MainNode(Node):
     
     def comm_info_cb(self, msg: CommunicationInfo):
         # TODO 测试！
+        # 其他飞机信息
         for uav_info in msg.uav:
-            self.uav_infos[uav_info.id] = uav_info
+            self.get_logger().info(
+                f'---------{uav_info.id}: {uav_info.mission_stat}------------'
+            )
+            self.uav_infos[uav_info.id-1] = uav_info
+            if uav_info.mission_stat == -1:
+                # 沒有任务状态，空数据
+                continue
+            if uav_info.mission_stat == MissionState.MIS_FORMATION_LEAVING:
+                LEAVING_ID.append(uav_info.id)
+                ADJ_MTX[:][uav_info.id-1] = 0 # 改变脱离的邻接矩阵
+                self.get_logger().info(
+                    f"id: {uav_info.id} is leaving"
+                )
+        if LEAVING_ID and 2 not in LEAVING_ID:
+            if 3 in LEAVING_ID:
+                TARGET_POS_LOCAL = np.array([
+                    [1.6,    4.2],
+                    [ 0.,    1.2],
+                    [ 0.,    0. ],
+                    [3.2,    1.2],
+                ], dtype=np.float64)
+            else:
+                TARGET_POS_LOCAL = np.array([
+                    [1.6,    4.2],
+                    [3.2,    1.2],
+                    [ 0.,    1.2],
+                    [ 0.,     0.],
+                ], dtype=np.float64)
+
+        # 本机信息
         self.tracking_list = msg.tracking_list.data
+        self.get_logger().info(
+            f"target update: {self.tracking_list} "
+            )
         self.dist_mat = msg.dist_mat.data
         self.guard_list = msg.guard_list.data
         # TODO 更新本机变量
+        if self.tracking_list[self.group*3-1] != -1:
+            self.mission_state = MissionState.MIS_FORMATION_LEAVING
+            # TARGET_POS_LOCAL[self.uav_id-1] = [0., 0.]
+            ADJ_MTX[:][self.uav_id-1] = 0
         
     def number_detected_cb(self, msg: DetectionResult):
         self.number_detected_state = True
@@ -497,6 +593,40 @@ class Comp29MainNode(Node):
         self.logger.debug(f"[FORM] vv_frd: {vv_frd[0]}, {vv_frd[1]}")
         return [vv_frd[0], vv_frd[1], 0.0]
     
+    def formation_leaving(self):
+        self.get_logger().info("***********i'm leaving************")
+        if self.local_pos_est is None:
+            return [0., 0., 0.]
+        time.sleep(2.0) # 等其他人先走一走
+        if self.number_detected_state:
+            self.mission_state = MissionState.MIS_LANDING
+            vv_frd = self.land_ctrl()
+        else:
+            # 位移到已知的目标位置上
+            tgt_x = self.tracking_list[self.group * 3 - 2]
+            tgt_y = self.tracking_list[self.group * 3 - 1]
+            if abs(tgt_x - self.local_pos_est[0]) > 0.2:
+                vv_frd = [self.uav_speed*((tgt_x - self.local_pos_est[0])/abs(tgt_x - self.local_pos_est[0])), 0., 0.]
+            else:
+                if abs(tgt_y - self.local_pos_est[1]) > 0.2:
+                    vv_frd = [0., self.uav_speed*((tgt_y - self.local_pos_est[1])/abs(tgt_x - self.local_pos_est[1])), 0.]
+                else:
+                    vv_frd = self.looking_around()
+        return vv_frd
+    
+    def looking_around(self):
+        """
+        附近瞎逛
+        """
+        while self.number_detected_state is False:
+            if abs(self.tracking_list[self.group*3-2] - self.local_pos_est[0]) > 2:
+                vv_frd = [self.uav_speed*((self.tracking_list[self.group*3-2] - self.local_pos_est[0])/abs(self.tracking_list[self.group][1] - self.local_pos_est[0])), 0., 0.]
+            elif abs(self.tracking_list[self.group*3-1] - self.local_pos_est[1]) > 2:
+                vv_frd = [self.uav_speed*((self.tracking_list[self.group*3-1] - self.local_pos_est[1])/abs(self.tracking_list[self.group][2] - self.local_pos_est[1])), 0., 0.]
+            else:
+                vv_frd = [np.random.uniform(-2,2), np.random.uniform(-2,2), 0]
+        return vv_frd
+
     def land_ctrl(self):
         # print("detect_num", self.detected_result.detected_num)
         # print("detect_pose",self.detected_result.detected_pose)
@@ -530,6 +660,7 @@ class Comp29MainNode(Node):
                     else:
                         self.logger.debug(f"未检测到目标")
                         # TODO 附近瞎逛或者离检测到的飞机近一点
+                        vv_frd = self.looking_around()
                         return vv_frd
             else:
                 return [0,0,1]
@@ -554,11 +685,20 @@ class Comp29MainNode(Node):
     
     def uav_setup(self):
         # 等待初始化与网络连接
-        
+        while self.mission_state == MissionState.MIS_WAIT:
+            self.logger.info("[MAIN] 等待任务开始")
+            time.sleep(1)
+        if self.mission_state == MissionState.MIS_BEGIN:
+            # TODO 解锁起飞
+            self.arm_cmd_pub.publish(Bool(data=True))
+            self.logger.info("[MAIN] 解锁")
+            time.sleep(1)
+            # 起飞
+            self.logger.info("[MAIN] 起飞")
+            pass
         # 等待消息
         
         # 解锁
-        self.arm_cmd_pub.publish(Bool(data=True))
         # 起飞
         pass
         
@@ -572,7 +712,7 @@ class Comp29MainNode(Node):
             if self.dist_got:
                 break
             else:
-                print("waiting for dist msgs")
+                # print("waiting for dist msgs")
                 time.sleep(0.2)
         r_hat = np.array([5, 0])
         vv = r_hat / np.linalg.norm(r_hat)
@@ -595,6 +735,7 @@ class Comp29MainNode(Node):
                 vv_frd = self.formation_ctrl()
                 pass
             elif self.mission_state == MissionState.MIS_FORMATION_LEAVING:
+                vv_frd = self.formation_leaving()
                 pass
             elif self.mission_state == MissionState.MIS_BASE:
                 pass
@@ -609,7 +750,7 @@ class Comp29MainNode(Node):
                 pass
             
             # 速度输出
-            # vv = [vv_frd[0], vv_frd[1], 0.0] if len(vv_frd)==2 else vv_frd
+            vv_frd = [vv_frd[0], vv_frd[1], 0.0] if len(vv_frd)==2 else vv_frd
             vv = vv_frd if isinstance(vv_frd, np.ndarray) else np.array(vv_frd)
             vv = vv if np.linalg.norm(vv) < MAX_SPD else vv*MAX_SPD/np.linalg.norm(vv)
             vv[0] = self.vel_set_x_filter.get_value(vv[0])
@@ -629,10 +770,10 @@ class Comp29MainNode(Node):
             vel_frd_msg.twist.linear.z = vv[2] 
             
             
-            self.get_logger().info(
-                f"d:{self.dists[0] :6.2f} {self.dists[1] :6.2f} {self.dists[2] :6.2f} {self.dists[3] :6.2f} == " + 
-                f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}, {vv[2]:4.2f} ; h:{self.lidar_height} "
-            )
+            # self.get_logger().info(
+            #     f"d:{self.dists[0] :6.2f} {self.dists[1] :6.2f} {self.dists[2] :6.2f} {self.dists[3] :6.2f} == " + 
+            #     f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}, {vv[2]:4.2f} ; h:{self.lidar_height} "
+            # )
             self.vel_frd_pub.publish(vel_frd_msg)
             # rclpy.spin_once(self)
             time.sleep(0.1)

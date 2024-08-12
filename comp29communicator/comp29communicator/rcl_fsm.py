@@ -12,7 +12,7 @@ from colorama import Fore, Back, Style
 #
 from comp29communicator.fsm import fsm
 from comp29communicator.flow_monitor import getNetworkRate
-import comp29communicator.fsm_command
+from comp29communicator import fsm_command
 from comp29communicator.UDPProcess import UDPCommunicator
 #
 import rclpy.time
@@ -20,7 +20,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
-from comp29msg.msg import UAVInfo, CommunicationInfo                        # TODO Remember to ``source ./install/setup.bash''
+from comp29msg.msg import UAVInfo, CommunicationInfo, DetectionResult                            # TODO Remember to ``source ./install/setup.bash''
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, DurabilityPolicy
 
 '''
@@ -66,7 +66,7 @@ is_uwb_updated = False
 def uwb_cb(msg: Float32MultiArray):
     global uwb_data, is_uwb_updated
     # TODO 注意UWB消息的下标
-    node.get_logger().info("got uwb!")
+    # node.get_logger().info("got uwb!")
     uwb_data = msg
     is_uwb_updated = True
 
@@ -77,6 +77,20 @@ def gps_cb(msg:PoseStamped):
     #
     gps_data = msg
     is_gps_updated = True
+    
+# 本机的目标识别
+is_tgt_updated = False
+def detected_tgt_cb(msg:DetectionResult):
+    global detected_tgt, is_tgt_updated
+    detected_tgt = msg
+    is_tgt_updated = True
+
+from std_msgs.msg import Int64
+local_mis_state = -1
+def mission_cb(msg:Int64):
+    global local_mis_state
+    # node.get_logger().info("[fsm] got mission state")
+    local_mis_state = msg.data
 
 class rcl_fsm(fsm):
     def __init__(self, idd, swarm_num, known_target_num, group, ip_list, target_port=25001):
@@ -94,6 +108,7 @@ class rcl_fsm(fsm):
         # ROS接口
         self.swarm_info = CommunicationInfo()
         for i in range(0, self.swarm_num):
+            node.get_logger().info(f"[fffffffxxxkkk] swarm num {self.swarm_num}")
             #
             self.swarm_info.uav.append(UAVInfo())
             #
@@ -171,10 +186,12 @@ class rcl_fsm(fsm):
             for i in range(0, len_t):
                 data_addr_t = self.udpc.recv_data_list.pop(-1)
                 # TODO trycatch
-                data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
+                try: 
+                    data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
 
-                self.update_swarm_info(data_recv_t)
-
+                    self.update_swarm_info(data_recv_t)
+                except:
+                    pass
                 if False:
                     print("[fsm] udp received: ")
                     print(data_addr_t)
@@ -189,14 +206,14 @@ class rcl_fsm(fsm):
         if self.is_send_critical_info_ack:
             self.is_send_critical_info_ack = False
 
-        print("233")
+        # print("233")
 
     def update_swarm_info(self, data_recv):
 
         if data_recv['frame_id'] == 1:
-            id_t = data_recv['uav_id']
+            id_t = data_recv['uav_id'] - 1
             #
-            self.swarm_info.uav[id_t].id = id_t
+            self.swarm_info.uav[id_t].id = id_t + 1
             self.swarm_info.uav[id_t].group_id = data_recv['group_id']
             #
             self.swarm_info.uav[id_t].pos.pose.position.x = float(data_recv['pos'][0])
@@ -226,6 +243,7 @@ class rcl_fsm(fsm):
             if False:
                 print(self.tgt_list)
             #
+            tmp = self.tgt_list.copy()
             is_found_current_id = False
             for i in range(0, self.known_target_num):
                 #
@@ -248,6 +266,9 @@ class rcl_fsm(fsm):
                         self.tgt_list[j][0] = tgt_id_updated
                         self.tgt_list[j][1] = x_new
                         self.tgt_list[j][2] = y_new                             # 直接更新
+                        break
+            # print(f"received{data_recv['tgt_list']}")
+            # print(f"received updated from {tmp} to {self.tgt_list}")
             # 
             for i in range(0, self.known_target_num):
                 self.swarm_info.tracking_list.data[i * 3]     = self.tgt_list[i][0]
@@ -271,7 +292,7 @@ class rcl_fsm(fsm):
                         is_found_current_id = True
                     elif not is_found_current_id and target_id == -1:
                         self.guard_list[j][0] = tgt_id_updated
-                        self.guard_list[j][1] = id_t                              # 如果当前的目标没有飞机守着, 则更新守着的飞机
+                        self.guard_list[j][1] = id_t + 1                              # 如果当前的目标没有飞机守着, 则更新守着的飞机
             #
             for i in range(0, self.known_target_num):
                 self.swarm_info.guard_list.data[i * 2]     = self.guard_list[i][0]
@@ -285,7 +306,7 @@ class rcl_fsm(fsm):
                       self.swarm_info.dist_mat.data[i * self.swarm_num + j] = self.adjacency_mat[i, j]
             #
             this_uav_data = self.update_this_uav_data()
-            self.swarm_info.uav.append(this_uav_data)
+            # self.swarm_info.uav.append(this_uav_data)
             self.swarm_info.uav.sort(key=functools.cmp_to_key(self.sort_swarm_info), reverse=True)      # 不加自己的序号会错
             
             if is_debugging:
@@ -295,7 +316,7 @@ class rcl_fsm(fsm):
             
         elif data_recv['frame_id'] == 2:
             #
-            companion_id_t = data_recv['id']
+            companion_id_t = data_recv['id'] - 1
             self.swarm_info.uav[companion_id_t].mission_stat = data_recv['cmd_id']
         elif data_recv['frame_id'] == 3:
             #
@@ -315,7 +336,7 @@ class rcl_fsm(fsm):
         for i in range(0, self.swarm_num):
             # TODO
             # 极大极小值滤除
-            self.dist_mat[companion_id, i] = dist_list_t[i]
+            self.dist_mat[companion_id-1, i] = dist_list_t[i]
 
     def update_this_uav_data(self):
         this_uav_data = UAVInfo()
@@ -326,20 +347,20 @@ class rcl_fsm(fsm):
         this_uav_data.pos.pose.position.y = self.pos_xyz[1]
         this_uav_data.pos.pose.position.z = self.pos_xyz[2]
         #
-        this_uav_data.vel.twist.linear.x = self.vel_xyz[0]
-        this_uav_data.vel.twist.linear.y = self.vel_xyz[1]
-        this_uav_data.vel.twist.linear.z = self.vel_xyz[2]
+        this_uav_data.vel.twist.linear.x = float(self.vel_xyz[0])
+        this_uav_data.vel.twist.linear.y = float(self.vel_xyz[1])
+        this_uav_data.vel.twist.linear.z = float(self.vel_xyz[2])
         this_uav_data.lat = self.lat
         this_uav_data.lon = self.lon
         #
         for i in range(0, self.swarm_num):
-                for j in range(0, self.swarm_num):
-                    #this_uav_data.adjacency_mat.data[i * self.swarm_num + j] = self.dist_mat[i, j]
-                    this_uav_data.adjacency_mat.data.append(self.dist_mat[i, j])
+            for j in range(0, self.swarm_num):
+                #this_uav_data.adjacency_mat.data[i * self.swarm_num + j] = self.dist_mat[i, j]
+                this_uav_data.adjacency_mat.data.append(self.dist_mat[i, j])
         #
         for i in range(0, self.swarm_num):
             #this_uav_data.dist.data[i] = self.dist_mat[self.id, i]
-            this_uav_data.dist.data.append(self.dist_mat[self.id, i])
+            this_uav_data.dist.data.append(self.dist_mat[self.id-1, i])
         #
         this_uav_data.tracking_tgt = self.current_tgt
         this_uav_data.mission_stat = self.mission_status
@@ -360,9 +381,10 @@ class rcl_fsm(fsm):
 
 def network_rate_thread(args=None):
     _, networkIn, networkOut = getNetworkRate(1)                # num -> 时间
-
-    print(Style.BRIGHT + Fore.BLUE + "[fsm flow monitor] In_rate: ", networkIn, "    Out_rate: ", networkOut)
-    print (Style.RESET_ALL)
+    # TODO log
+    node.get_logger().info("")
+    # print(Style.BRIGHT + Fore.BLUE + "[fsm flow monitor] In_rate: ", networkIn, "    Out_rate: ", networkOut)
+    # print (Style.RESET_ALL)
 
 
 def main(args=None):
@@ -376,6 +398,7 @@ def main(args=None):
     global planner_info, is_uav_info_updated        
     global uwb_data, is_uwb_updated
     global gps_data, is_gps_updated
+    global detected_tgt, is_tgt_updated
 
     rclpy.init(args=args)
     global node
@@ -459,6 +482,8 @@ def main(args=None):
     comm_info_topic_name = "/uav" + str(uav_id) + "/comm_info"
     uwb_topic_name       = '/uwb_filtered'
     gps_topic_name       = 'gps_position'
+    detected_tgt_topic_name = 'number_detected_pos' # number_detected_pos
+    mission_topic_name   = '/mission_state'
     #
     # 消息控制
     qos_profile = QoSProfile(
@@ -466,11 +491,13 @@ def main(args=None):
         history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
         depth=1                                    # 历史消息的队列长度
     )
+    mission_sub   = node.create_subscription(Int64,         mission_topic_name, mission_cb, qos_profile)
     position_sub  = node.create_subscription(PoseStamped,  pos_topic_name, pos_cb, qos_profile)
     velocity_sub  = node.create_subscription(TwistStamped, vel_topic_name, vel_cb, qos_profile)
     uav_info_sub  = node.create_subscription(UAVInfo,      uav_info_topic_name, planner_info_cb, qos_profile)
     uwb_info_sub  = node.create_subscription(Float32MultiArray, uwb_topic_name, uwb_cb, qos_profile)
     gps_pos_sub   = node.create_subscription(PoseStamped, gps_topic_name, gps_cb, qos_profile)
+    detected_tgt_sub = node.create_subscription(DetectionResult, detected_tgt_topic_name, detected_tgt_cb, 1)
     #
     comm_info_pub = node.create_publisher(CommunicationInfo,  comm_info_topic_name, qos_profile)
     
@@ -482,10 +509,18 @@ def main(args=None):
 
         while True:  
             rclpy.spin_once(node, timeout_sec=0.1)
+            node.get_logger().info(f"{fsm_t.tgt_list}")
+            
+            # detected tgt
+            if is_tgt_updated:
+                fsm_t.update(tgt = [int(detected_tgt.object_name.data), detected_tgt.position.x, detected_tgt.position.y])
+                is_tgt_updated = False
+
             # 
             # ROS收到Planner的数据转发
-            if is_uav_info_updated:
-                fsm_t.update(current_tgt=planner_info.tracking_tgt, mission_stat=planner_info.mission_stat)
+                # fsm_t.update(current_tgt=planner_info.tracking_tgt, mission_stat=planner_info.mission_stat)
+                # TODO 写死
+                fsm_t.update(current_tgt=uav_group_id, mission_stat=local_mis_state)
 
                 is_uav_info_updated = False
 
@@ -521,6 +556,7 @@ def main(args=None):
             # 发送新消息
             if fsm_t.is_data_received:
                 fsm_t.swarm_info.header.stamp = node.get_clock().now().to_msg()
+                node.get_logger().info(f"[fffffffxxxkkk] swarm num {len(fsm_t.swarm_info.uav)}")
                 comm_info_pub.publish(fsm_t.swarm_info)
 
                 fsm_t.is_data_received = False

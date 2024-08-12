@@ -118,13 +118,14 @@ class DrvCmd:
     # 0: task index 1-6: params
     # tasks
     DRV_CMD_TASK_WAIT           = 0
+    DRV_CMD_TASK_READY          = 4
     DRV_CMD_TASK_BEGIN          = 1
     DRV_CMD_TASK_ILLEGAL_AREA   = 2
-    DRV_CMD_TASK_END            = 8
     DRV_CMD_TASK_GOTO_WAIT      = 10  # x, y, yaw
     DRV_CMD_TASK_FOLLOW_PERSON  = 12
     DRV_CMD_TASK_TEST_GOTO      = 80  # x, y, yaw
     DRV_CMD_OFFBOARD            = 90    
+    DRV_CMD_TASK_END            = 99
     DRV_CMD_EMERGENCY_STOP      = 100
     # about target
     DRV_INFO_TARGET_POS_GLOBAL = 101  # x, y

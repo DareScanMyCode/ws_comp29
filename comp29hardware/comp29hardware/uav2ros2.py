@@ -8,7 +8,7 @@ from quaternions import Quaternion as Quaternion
 import math
 import os
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-
+from comp29hardware.GcsOnboardClient.python.config import DrvCmd
 from sensor_msgs.msg        import Imu
 from geometry_msgs.msg      import PoseStamped
 from std_msgs.msg           import Float32MultiArray
@@ -38,6 +38,7 @@ class Uav2ROSNode(Node):
         # TODO 是否修改成同步发送，收到信息就发送？需要修改UAVOnboard程序
         self.fcu_pub_fps        = self.declare_parameter('fcu_pub_fps', 20.0).get_parameter_value().double_value
         
+        self.mis_state_pub      = self.create_publisher(Int64,             'mission_state', 1)
         self.imu_pub            = self.create_publisher(Imu,               'imu', 1)
         self.servo_pub          = self.create_publisher(Float32MultiArray, 'servo_data', 1)
         self.attitude_tgt_pub   = self.create_publisher(Float32MultiArray, 'attitude_setpt', 1)
@@ -180,6 +181,18 @@ class Uav2ROSNode(Node):
         should_pub_gps              = True
         should_pub_vel              = True
         should_pub_lidar_height     = True
+        mis_msg = Int64()
+        if self.uav.mission_state == DrvCmd.DRV_CMD_TASK_WAIT:
+            mis_msg.data = 0
+        elif self.uav.mission_state == DrvCmd.DRV_CMD_TASK_READY:
+            mis_msg.data = 1
+        elif self.uav.mission_state == DrvCmd.DRV_CMD_TASK_BEGIN:
+            mis_msg.data = 2
+        elif self.uav.mission_state == DrvCmd.DRV_CMD_TASK_END:
+            mis_msg.data = 3
+        elif self.uav.mission_state == DrvCmd.DRV_CMD_EMERGENCY_STOP:
+            mis_msg.data = 4
+        self.mis_state_pub.publish(mis_msg)
         # pub IMU
         if should_pub_imu and self.uav.imu_acc is not None:
             imu_msg = Imu()

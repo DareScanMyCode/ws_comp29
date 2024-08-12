@@ -1,5 +1,9 @@
 class MissionState:
     MIS_WAIT                    = 0
+    MIS_READY                   = 1
+    MIS_BEGIN                   = 2
+    MIS_END                     = 3
+    MIS_STOP                    = 4
     MIS_FORMATION               = 10
     MIS_FORMATION_FOLLOW        = 11
     MIS_FORMATION_LEAVING       = 12

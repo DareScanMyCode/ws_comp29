@@ -10,7 +10,7 @@ import math
 import time
 import functools
 import schedule
-import  comp29communicator.fsm_command
+from  comp29communicator import fsm_command
 
 '''
   parameters
@@ -137,8 +137,10 @@ class fsm():
             len_t = min(data_num_to_handle, self.udpc.recv_data_list.__len__())     # 一次考虑只处理几条
             for i in range(0, len_t):
                 data_addr_t = self.udpc.recv_data_list.pop(-1)
-                data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
-
+                try:
+                    data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
+                except:
+                    pass
                 if False:
                     print("[fsm] udp received: ")
                     print(data_addr_t)
@@ -152,7 +154,7 @@ class fsm():
             self.is_send_critical_info_ack = False
 
 
-        print("233")
+        # print("233")
 
 
     def reset_uav_info(self, uav_id=None, group_id=None):
@@ -161,7 +163,7 @@ class fsm():
         if group_id != None:
             self.group = group_id
 
-    def update(self, vel=None, dist_list=None, adjacency_mat=None, pos=None, latlon=None, tgt_list=None, guard_list=None, current_tgt=None, mission_stat=None):
+    def update(self, vel=None, dist_list=None, adjacency_mat=None, pos=None, latlon=None, tgt=None, guard_list=None, current_tgt=None, mission_stat=None):
         if vel != None:
             self.vel_xyz[0] = vel[0]
             self.vel_xyz[1] = vel[1]
@@ -186,12 +188,25 @@ class fsm():
         if latlon != None:
             self.lat = latlon[0]
             self.lon = latlon[1]            
-        if tgt_list != None:
+        if tgt != None:
             try:
+                self.tgt_list.sort(key=functools.cmp_to_key(self.sort_tgt_list_guard_list), reverse=True)      # 做了这一步以后, identified, i.e., -1, 一定在最后
+                tmp = self.tgt_list.copy()
                 for i in range(0, self.known_target_num):
-                    self.tgt_list[i][0] = tgt_list[i][0]
-                    self.tgt_list[i][1] = tgt_list[i][1]
-                    self.tgt_list[i][2] = tgt_list[i][2]
+                    if self.tgt_list[i][0] == tgt[0]:
+                        # update
+                        alpha = 0.33
+                        # x
+                        self.tgt_list[i][1] = (1. - alpha) *  self.tgt_list[i][1] + alpha * tgt[1]           # lpf
+                        # y
+                        self.tgt_list[i][2] = (1. - alpha) *  self.tgt_list[i][2] + alpha * tgt[2]
+                        break
+                    elif self.tgt_list[i][0] == -1:
+                        self.tgt_list[i][0] = tgt[0]
+                        self.tgt_list[i][1] = tgt[1] 
+                        self.tgt_list[i][2] = tgt[2] 
+                        break
+                # print(f"local received updated from {tmp} to {self.tgt_list}")
             except:
                 print("[fsm] target list updating error ...")
         if guard_list != None:
@@ -377,7 +392,7 @@ class fsm():
             print(struct.unpack(unpack_format_t_2, data_to_send[10:54]))
             print(struct.unpack(unpack_format_t_3, data_to_send[54:90]))
             print(struct.unpack(unpack_format_t_4, data_to_send[90:]))
-        print(f"[fsm] data_to_send len: {len(data_to_send)}")
+        # print(f"[fsm] data_to_send len: {len(data_to_send)}")
         return data_to_send
 
     def Unpack_Info(self, data_received, is_debugging=False):

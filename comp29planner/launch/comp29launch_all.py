@@ -46,7 +46,14 @@ def generate_launch_description():
         name='number_detector',
         output='screen',
     )
-   
+    
+    comp29_communicate_node=Node(
+        package='comp29communicator',
+        executable='rcl_fsm_main',
+        name='Communicator_FSM',
+        output='screen',        
+    )
+      
     return LaunchDescription([
         param1,
         param2,
@@ -54,6 +61,7 @@ def generate_launch_description():
         hardware_gport_node,
         hardware_uav_node,
         comp29_planner_node,
-        comp29_detector_node
+        comp29_detector_node,
+        comp29_communicate_node
         # node2,
     ])

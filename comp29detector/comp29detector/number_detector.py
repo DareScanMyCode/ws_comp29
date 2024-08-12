@@ -18,6 +18,7 @@ from rknnlite.api import RKNNLite
 import rclpy  
 from rclpy.node import Node  
 from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool, Header, Int64
 from comp29msg.msg import DetectionResult
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, DurabilityPolicy
@@ -214,7 +215,7 @@ parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--model_path', type=str, default="/home/cat/ws_comp29/src/weights/best123.rknn", help='model path, could be .pt or .rknn file')
 parser.add_argument('--target', type=str, default='rk3588', help='target RKNPU platform')
 parser.add_argument('--device_id', type=str, default=None, help='device id')
-parser.add_argument('--img_show', action='store_true', default=False, help='draw the result and show')
+parser.add_argument('--img_show', action='store_true', default=True, help='draw the result and show')
 parser.add_argument('--img_save', action='store_true', default=True, help='save the result')
 # parser.add_argument('--anno_json', type=str, default='../../../datasets/COCO/annotations/instances_val2017.json', help='coco annotation path')
 # parser.add_argument('--img_folder', type=str, default='../model', help='img folder path')
@@ -250,10 +251,27 @@ class NumberDetector(Node):
             history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
             depth=1                                    # 历史消息的队列长度
             )
-        self.publisher_ = self.create_publisher(DetectionResult, '/number_detected', 10)
-        self.cap = cv2.VideoCapture(video_path)
         
+        self.local_pos_ned=[0.,0.,0.]
+        
+        self.local_position_ned_est_sub  = self.create_subscription(
+            PoseStamped, 
+            '/local_position_ned',  
+            self.local_pos_ned_cb, 
+            qos_profile
+        )
+        
+        self.publisher_ = self.create_publisher(DetectionResult, '/number_detected', 10)
+        self.publisher_pos_ = self.create_publisher(DetectionResult, '/number_detected_pos', 10)
+        self.cap = cv2.VideoCapture(video_path)
+    
+    def local_pos_ned_cb(self,msg):
+        self.local_pos_ned=[msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]
+    
     def run(self):
+        #-10s
+        last_detect_time=time.time()-10.0
+        consecutive_detect_num=0
         while rclpy.ok():
             try:
                 ret, img_src = self.cap.read()
@@ -313,10 +331,10 @@ class NumberDetector(Node):
                     # print(boxes)
                     for i in range(0, len(boxes)):
                         #可以写死决定目标是 1 或 2 或 3
-                        print(classes)
+                        # self.get_logger().info(f"class{classes[i]}")
                         # TODO 确认目标类型
                         # 不管啥类型都得发的！
-                        if classes[i] == 1 :
+                        if classes[i] in [0,1,2] :
                             if scores[i] == max(scores):
                                 # define the landing position
                                 # 停于目标下方（可以写死来规定哪家飞机停哪里）
@@ -331,12 +349,24 @@ class NumberDetector(Node):
                                 # 左下方
                                 #     x_mid=(boxes[i, 2])/640
                                 #     y_mid=(boxes[i, 1])/640
-                                msg.position = Point(x=float(x_mid), y=float(y_mid), z=0.0)
-                                msg.object_name = Int64()
-                                msg.object_name.data = 2
-                                # TODO header
-                                # msg.header = Header(stamp=rclpy.time.Time())
-                                self.publisher_.publish(msg)
+                                if time.time()-last_detect_time>1.0:#重置
+                                  last_detect_time=time.time()
+                                  consecutive_detect_num=1
+                                else:
+                                  consecutive_detect_num+=1
+                                  last_detect_time=time.time()
+                                if consecutive_detect_num>3:#
+                                #   self.get_logger().info("send detect msg")
+                                  msg.position = Point(x=float(x_mid), y=float(y_mid), z=0.0)
+                                  msg.object_name = Int64()
+                                  msg.object_name.data = int(classes[i] + 1)
+                                  # TODO header
+                                  # msg.header = Header(stamp=rclpy.time.Time())
+                                  self.publisher_.publish(msg)
+                                  # TODO 逻辑修改
+                                  if(np.linalg.norm(self.local_pos_ned)>0.1) or True:
+                                    msg.position = Point(x=self.local_pos_ned[0], y=self.local_pos_ned[1], z=0.0)
+                                    self.publisher_pos_.publish(msg)
             except KeyboardInterrupt:
                 break
 
