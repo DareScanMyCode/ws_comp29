@@ -21,6 +21,7 @@ from sensor_msgs.msg import Imu
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from std_msgs.msg import Float32MultiArray, MultiArrayDimension
 from comp29msg.msg import UAVInfo, CommunicationInfo                        # TODO Remember to ``source ./install/setup.bash''
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, DurabilityPolicy
 
 '''
   parameters
@@ -59,12 +60,13 @@ def planner_info_cb(msg):
     #
     planner_info = msg
     is_uav_info_updated = True
-
+node = None
 uwb_data = Float32MultiArray()
 is_uwb_updated = False
-def uwb_cb(msg):
+def uwb_cb(msg: Float32MultiArray):
     global uwb_data, is_uwb_updated
-    #
+    # TODO 注意UWB消息的下标
+    node.get_logger().info("got uwb!")
     uwb_data = msg
     is_uwb_updated = True
 
@@ -168,6 +170,7 @@ class rcl_fsm(fsm):
             len_t = min(data_num_to_handle, self.udpc.recv_data_list.__len__())     # 一次考虑只处理几条
             for i in range(0, len_t):
                 data_addr_t = self.udpc.recv_data_list.pop(-1)
+                # TODO trycatch
                 data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
 
                 self.update_swarm_info(data_recv_t)
@@ -196,15 +199,15 @@ class rcl_fsm(fsm):
             self.swarm_info.uav[id_t].id = id_t
             self.swarm_info.uav[id_t].group_id = data_recv['group_id']
             #
-            self.swarm_info.uav[id_t].pos.pose.position.x = data_recv['pos'][0]
-            self.swarm_info.uav[id_t].pos.pose.position.y = data_recv['pos'][1]
-            self.swarm_info.uav[id_t].pos.pose.position.z = data_recv['pos'][2]            
+            self.swarm_info.uav[id_t].pos.pose.position.x = float(data_recv['pos'][0])
+            self.swarm_info.uav[id_t].pos.pose.position.y = float(data_recv['pos'][1])
+            self.swarm_info.uav[id_t].pos.pose.position.z = float(data_recv['pos'][2])
             #
-            self.swarm_info.uav[id_t].vel.twist.linear.x = data_recv['vel'][0]
-            self.swarm_info.uav[id_t].vel.twist.linear.y = data_recv['vel'][1]
-            self.swarm_info.uav[id_t].vel.twist.linear.z = data_recv['vel'][2]
-            self.swarm_info.uav[id_t].lat = data_recv['lat']
-            self.swarm_info.uav[id_t].lon = data_recv['lon']
+            self.swarm_info.uav[id_t].vel.twist.linear.x  = float(data_recv['vel'][0])
+            self.swarm_info.uav[id_t].vel.twist.linear.y  = float(data_recv['vel'][1])
+            self.swarm_info.uav[id_t].vel.twist.linear.z  = float(data_recv['vel'][2])
+            self.swarm_info.uav[id_t].lat = float(data_recv['lat'])
+            self.swarm_info.uav[id_t].lon = float(data_recv['lon'])
             #
             for i in range(0, self.swarm_num):
                  self.swarm_info.uav[id_t].dist.data[i] = data_recv['dist_list'][i]
@@ -375,6 +378,7 @@ def main(args=None):
     global gps_data, is_gps_updated
 
     rclpy.init(args=args)
+    global node
     node = Node('Communicator_FSM')
     username = os.getenv("USER", "cat")
     if username == 'cat':
@@ -453,17 +457,23 @@ def main(args=None):
     vel_topic_name = "/uav" + str(uav_id) + "/ekf2/vel"                # from MAVLink: 'velocity_and_angular'   from EKF2: '/uav' + str(uav_id) + "/ekf2/vel"
     uav_info_topic_name  = "/uav" + str(uav_id) + "/planner_info"
     comm_info_topic_name = "/uav" + str(uav_id) + "/comm_info"
-    uwb_topic_name       = 'uwb_filtered_topic'
+    uwb_topic_name       = '/uwb_filtered'
     gps_topic_name       = 'gps_position'
     #
-    position_sub  = node.create_subscription(PoseStamped,  pos_topic_name, pos_cb, 1)
-    velocity_sub  = node.create_subscription(TwistStamped, vel_topic_name, vel_cb, 1)
-    uav_info_sub  = node.create_subscription(UAVInfo,      uav_info_topic_name, planner_info_cb, 1)
-    uwb_info_sub  = node.create_subscription(Float32MultiArray, uwb_topic_name, uwb_cb, 1)
-    gps_pos_sub   = node.create_subscription(PoseStamped, gps_topic_name, gps_cb, 1)
+    # 消息控制
+    qos_profile = QoSProfile(
+        reliability=QoSReliabilityPolicy.RELIABLE,  # 设置可靠性为RELIABLE
+        history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
+        depth=1                                    # 历史消息的队列长度
+    )
+    position_sub  = node.create_subscription(PoseStamped,  pos_topic_name, pos_cb, qos_profile)
+    velocity_sub  = node.create_subscription(TwistStamped, vel_topic_name, vel_cb, qos_profile)
+    uav_info_sub  = node.create_subscription(UAVInfo,      uav_info_topic_name, planner_info_cb, qos_profile)
+    uwb_info_sub  = node.create_subscription(Float32MultiArray, uwb_topic_name, uwb_cb, qos_profile)
+    gps_pos_sub   = node.create_subscription(PoseStamped, gps_topic_name, gps_cb, qos_profile)
     #
-    comm_info_pub = node.create_publisher(CommunicationInfo,  comm_info_topic_name, 1)
-
+    comm_info_pub = node.create_publisher(CommunicationInfo,  comm_info_topic_name, qos_profile)
+    
     try:
         schedule.every(0.1).seconds.do(fsm_t.FSMCallback)                 # TODO, 调短
         schedule.every(0.05).seconds.do(network_rate_thread)
@@ -471,6 +481,7 @@ def main(args=None):
         fsm_t.udpc.start_receive_thread()
 
         while True:  
+            rclpy.spin_once(node, timeout_sec=0.1)
             # 
             # ROS收到Planner的数据转发
             if is_uav_info_updated:
@@ -492,10 +503,12 @@ def main(args=None):
 
                 is_vel_updated = False
 
-            # TODO
+            # TODO 注意这里的list的下标！
             # ROS收到UWB数据转发
             if is_uwb_updated:
-                fsm_t.update(dist_list=uwb_data.data)
+                uwb_index_begin = uwb_data.layout.dim[0].size * uav_id + 1
+                uwb_index_end   = uwb_index_begin + uwb_data.layout.dim[0].size
+                fsm_t.update(dist_list=uwb_data.data[uwb_index_begin: uwb_index_end])
 
                 is_uwb_updated = False
 

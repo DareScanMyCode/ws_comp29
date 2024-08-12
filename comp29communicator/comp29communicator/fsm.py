@@ -17,7 +17,7 @@ import  comp29communicator.fsm_command
 '''
 uav_id = 3
 uav_group_id = 1
-swarm_num = 8
+# swarm_num = 8
 known_target_num = 3
 #
 target_ip_for_debugging = '127.0.0.1'           # 单引号
@@ -93,7 +93,7 @@ class fsm():
         self.is_send_critical_info_ack = False
 
         # 放最后
-        self.is_debugging = True
+        self.is_debugging = False
         self.t_start = time.time()
 
     def shutdown(self):
@@ -168,14 +168,14 @@ class fsm():
             self.vel_xyz[2] = vel[2]
         if dist_list != None:
             try:
-                for i in range(0, swarm_num):
+                for i in range(0, self.swarm_num):
                     self.neighbor_dist_list[i] = dist_list[i]
             except:
                 print("[fsm] neighboring list updating error ...")
         if adjacency_mat != None:
             try:
-                for i in range(0, swarm_num):
-                    for j in range(0, swarm_num):
+                for i in range(0, self.swarm_num):
+                    for j in range(0, self.swarm_num):
                         self.adjacency_mat[i, j] = adjacency_mat[i, j]
             except:
                 print("[fsm] adjacency matrix updating error ...")
@@ -209,7 +209,7 @@ class fsm():
     def Pack_Info(self, is_debugging=False):
         # 帧头    帧头    数据帧ID  时间    飞机ID    飞机分组    速度x,y,z  邻居dist_list    邻接矩阵8*8    位置估计xy    高度估计z    lat    lon    已知目标(id + xy) * 3    已知目标跟踪飞机ID    跟踪状态    飞机任务状态 lat lon
         # 0xAB   0xEF      1
-        data_to_send = str()
+        data_to_send = bytes()
         #
         self.header1 = 0xAB                           # uint8_t
         self.header2 = 0xEF                           # uint8_t
@@ -217,7 +217,7 @@ class fsm():
         self.time_t = time.time() - self.t_start      # uint32_t *1000 -> ms
         self.id                                       # uint8_t
         self.group                                    # uint8_t
-        data_to_send = struct.pack("BBBIBB", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, self.group)
+        data_to_send = struct.pack("=BBBIBB", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, self.group)
         if is_debugging:
             print("[fsm] data_to_send 1")
             print(data_to_send)
@@ -233,17 +233,17 @@ class fsm():
             self.vel_xyz[0] =  1.234
             self.vel_xyz[1] = -2.345
             self.vel_xyz[2] =  3.456
-        data_to_send_2 = struct.pack("fff", self.vel_xyz[0], self.vel_xyz[1], self.vel_xyz[2])
+        data_to_send_2 = struct.pack("=fff", self.vel_xyz[0], self.vel_xyz[1], self.vel_xyz[2])
         # self.neighbor_dist_list
         for i in range(0, self.swarm_num):
-            data_to_send_2 = data_to_send_2 + struct.pack("f", self.neighbor_dist_list[i])
+            data_to_send_2 = data_to_send_2 + struct.pack("=f", self.neighbor_dist_list[i])
         #
         # CRITICAL
         data_to_send = data_to_send + data_to_send_2
         if is_debugging:
             print("[fsm] data_to_send 2")
             print(data_to_send_2)
-            unpack_format_t = "fff"
+            unpack_format_t = "=fff"
             for i in range(0, self.swarm_num):
                 unpack_format_t = unpack_format_t + "f"
             print(struct.unpack(unpack_format_t, data_to_send_2))
@@ -280,7 +280,7 @@ class fsm():
                 if self.adjacency_mat[i, j] == 1:
                     mat_line_t = mat_line_t | (1 << j)
             # adjacency_mat_to_send.append(mat_line_t)
-            data_to_send_3 = data_to_send_3 + struct.pack("B", mat_line_t)
+            data_to_send_3 = data_to_send_3 + struct.pack("=B", mat_line_t)
         #
         # self.pos_xyz[0]
         # self.pos_xyz[1]
@@ -289,8 +289,8 @@ class fsm():
         # self.lat 小数位       float * 1.7e deg 
         # self.lon              float * 1.e7 deg 这里必须这么发(连着发f)不然打包格式会有问题
         # self.lon 小数位       float * 1.7e deg 
-        data_to_send_3 = data_to_send_3 + struct.pack("fff", self.pos_xyz[0], self.pos_xyz[1], self.pos_xyz[2])
-        data_to_send_3 = data_to_send_3 + struct.pack("ffff",  float(self.lat * 1.e7), self.get_minor_0(self.lat) * 1.e7, float(self.lon * 1.e7), self.get_minor_0(self.lon) * 1.e7)
+        data_to_send_3 = data_to_send_3 + struct.pack("=fff", self.pos_xyz[0], self.pos_xyz[1], self.pos_xyz[2])
+        data_to_send_3 = data_to_send_3 + struct.pack("=ffff",  float(self.lat * 1.e7), self.get_minor_0(self.lat) * 1.e7, float(self.lon * 1.e7), self.get_minor_0(self.lon) * 1.e7)
         #
         # CRITICAL
         data_to_send = data_to_send + data_to_send_3
@@ -337,11 +337,11 @@ class fsm():
         # self.mission_status
         #
         for i in range(0, self.known_target_num):
-            data_to_send_4 = data_to_send_4 + struct.pack("bff", self.tgt_list[i][0], self.tgt_list[i][1], self.tgt_list[i][2])
+            data_to_send_4 = data_to_send_4 + struct.pack("=bff", self.tgt_list[i][0], self.tgt_list[i][1], self.tgt_list[i][2])
         #
         for i in range(0, self.known_target_num):
-            data_to_send_4 = data_to_send_4 + struct.pack("bb", self.guard_list[i][0], self.guard_list[i][1])
-        data_to_send_4 = data_to_send_4 + struct.pack("bb", self.current_tgt, self.mission_status)
+            data_to_send_4 = data_to_send_4 + struct.pack("=bb", self.guard_list[i][0], self.guard_list[i][1])
+        data_to_send_4 = data_to_send_4 + struct.pack("=bb", self.current_tgt, self.mission_status)
         #
         # CRITICAL
         data_to_send = data_to_send + data_to_send_4
@@ -377,7 +377,7 @@ class fsm():
             print(struct.unpack(unpack_format_t_2, data_to_send[10:54]))
             print(struct.unpack(unpack_format_t_3, data_to_send[54:90]))
             print(struct.unpack(unpack_format_t_4, data_to_send[90:]))
-
+        print(f"[fsm] data_to_send len: {len(data_to_send)}")
         return data_to_send
 
     def Unpack_Info(self, data_received, is_debugging=False):
@@ -385,9 +385,10 @@ class fsm():
             return []
 
         data_t = {}
+        # print(f"[fsm] got data len: {len(data_received)}")
         #
-        unpack_format_t_1 = "BBBIB"
-        unpacked_1 = struct.unpack(unpack_format_t_1, data_received[0:9])
+        unpack_format_t_1 = "=BBBIB"
+        unpacked_1 = struct.unpack(unpack_format_t_1, data_received[0:8])
         if is_debugging:
             print("[fsm] unpacking common data: ")
             print(unpacked_1)
@@ -406,13 +407,13 @@ class fsm():
             #
             unpack_1_end = 8
             #
-            unpack_format_t_2 = "Bfff"
+            unpack_format_t_2 = "=Bfff"
             unpack_2_end = unpack_1_end + 13
             for i in range(0, self.swarm_num):
                 unpack_format_t_2 = unpack_format_t_2 + "f"
                 unpack_2_end = unpack_2_end + 4
             #
-            unpack_format_t_3 = ""
+            unpack_format_t_3 = "="
             unpack_3_end = unpack_2_end
             for i in range(0, self.swarm_num):
                 unpack_format_t_3 = unpack_format_t_3 + "B"
@@ -421,28 +422,23 @@ class fsm():
             unpack_format_t_3 = unpack_format_t_3 + "ffff"
             unpack_3_end = unpack_3_end + 7 * 4
             #
-            unpack_format_t_4 = ""
+            unpack_format_t_4 = "="
             for i in range(0, self.known_target_num):
                 unpack_format_t_4 = unpack_format_t_4 + "bff"
             for i in range(0, self.known_target_num):
                 unpack_format_t_4 = unpack_format_t_4 + "bb"
             unpack_format_t_4 = unpack_format_t_4 + 'bb'
-            # print(unpack_format_t_2)
-            # print(unpack_format_t_3)
-            # print(unpack_format_t_4)
-            # print(unpack_1_end)
-            # print(unpack_2_end)
-            # print(unpack_3_end)
-            # print(unpack_4_end)
             
             unpacked_2 = struct.unpack(unpack_format_t_2, data_received[unpack_1_end:unpack_2_end])  # 这个6是试出来的, 不要问我咋知道的, TODO, check correctness! 如果错了则改回unpack_format_t_1 = "BBBIBB", unpack_format_t_2 = "fff"
             unpacked_3 = struct.unpack(unpack_format_t_3, data_received[unpack_2_end:unpack_3_end])
             unpacked_4 = struct.unpack(unpack_format_t_4, data_received[unpack_3_end:])
-
+            
             #
             data_t['group_id']  = unpacked_2[0]
             data_t['vel']       = [ unpacked_2[1], unpacked_2[2], unpacked_2[3] ]
-            data_t['dist_list'] = [ unpacked_2[4 + i] for i in range(0, swarm_num) ]
+            
+            # print(f"[fsm] {[i for i in range(0, self.swarm_num)]}")
+            data_t['dist_list'] = [ unpacked_2[4 + i] for i in range(0, self.swarm_num) ]
             #
             adjacency_mat_debug = np.zeros([self.swarm_num, self.swarm_num])
             for i in range(0, self.swarm_num):
@@ -452,9 +448,9 @@ class fsm():
                         adjacency_mat_debug[i, j] = 1
                     mat_this_line = (mat_this_line >> 1) & 0x00FF
             #
-            data_t['pos']  = [ unpacked_3[swarm_num], unpacked_3[swarm_num + 1], unpacked_3[swarm_num + 2] ]
-            data_t['lat']  = self.my_floor(unpacked_3[swarm_num + 3] / 1.e7) + unpacked_3[swarm_num + 4] / 1.e7
-            data_t['lon']  = self.my_floor(unpacked_3[swarm_num + 5] / 1.e7) + unpacked_3[swarm_num + 6] / 1.e7
+            data_t['pos']  = [ unpacked_3[self.swarm_num], unpacked_3[self.swarm_num + 1], unpacked_3[self.swarm_num + 2] ]
+            data_t['lat']  = self.my_floor(unpacked_3[self.swarm_num + 3] / 1.e7) + unpacked_3[self.swarm_num + 4] / 1.e7
+            data_t['lon']  = self.my_floor(unpacked_3[self.swarm_num + 5] / 1.e7) + unpacked_3[self.swarm_num + 6] / 1.e7
             #
             recv_tgt_list_len = self.known_target_num * 3
             data_t['tgt_list'] = []
@@ -507,7 +503,7 @@ class fsm():
         self.time_t = time.time() - self.t_start      # uint32_t *1000 -> ms
         self.id                                       # uint8_t
         cmd_id                                        # uint16_t
-        data_to_send = struct.pack("BBBIBI", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, cmd_id)
+        data_to_send = struct.pack("=BBBIBI", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, cmd_id)
 
         return data_to_send
   
@@ -522,7 +518,7 @@ class fsm():
         cmd_id                                        # uint16_t
         companion_id                                  # uint8_t
         fsm_command.command_ack
-        data_to_send = struct.pack("BBBIBIBB", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, cmd_id, companion_id, fsm_command.command_ack)
+        data_to_send = struct.pack("=BBBIBIBB", self.header1, self.header2, frame_id, int(self.time_t * 1000), self.id, cmd_id, companion_id, fsm_command.command_ack)
 
         return data_to_send
 
