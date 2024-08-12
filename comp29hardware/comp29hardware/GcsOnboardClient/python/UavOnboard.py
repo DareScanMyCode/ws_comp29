@@ -460,6 +460,7 @@ class UAVOnBoard:
 
     def uav_takeoff_opened(self, height = 0.9):
         TAKEOFF_SPD = 0.2
+        self.vel_mode = self.VEL_MODE_FRD
         self.vel_set_frd.x = 0
         self.vel_set_frd.y = 0
         self.vel_set_frd.z = -TAKEOFF_SPD
@@ -616,9 +617,10 @@ class UAVOnBoard:
                     if cmd == mavutil.mavlink.MAV_CMD_NAV_TAKEOFF:
                         takeoff_height = param1
                         print(f"[CMD] TAKOFF {takeoff_height}")
-                        if takeoff_height == 0:
-                            self.uav_take_off()
+                        if takeoff_height == 0.:
+                            self.uav_takeoff_opened()
                         else:
+                            self.uav_takeoff_opened(takeoff_height)
                             pass
                         pass
                     elif cmd == mavutil.mavlink.MAV_CMD_NAV_LAND:
@@ -891,6 +893,7 @@ if __name__ == "__main__":
     import os
     UAV_ID = os.environ.get("UAV_ID")
     Uav = UAVOnBoard(ros_on=args.ros_on)
+    Uav.start_send_vel_cmd_t()
     if args.test == 1:
         Uav.start_send_vel_cmd_t()
         
