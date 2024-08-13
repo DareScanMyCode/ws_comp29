@@ -15,6 +15,7 @@ from .py_utils.coco_utils import COCO_test_helper
 
 from rknnlite.api import RKNNLite
 
+from geometry_msgs.msg import Vector3
 import rclpy  
 from rclpy.node import Node  
 from geometry_msgs.msg import Point
@@ -253,6 +254,9 @@ class NumberDetector(Node):
             )
         
         self.local_pos_ned=[0.,0.,0.]
+        self.color_blue_hsv = [113, 255, 196]
+        self.color_orange_hsv = [11, 190, 255]
+        self.clicked_color = None
         
         self.local_position_ned_est_sub  = self.create_subscription(
             PoseStamped, 
@@ -261,26 +265,75 @@ class NumberDetector(Node):
             qos_profile
         )
         
+        self.color_publisher = self.create_publisher(Vector3, '/color_offset', 10)
         self.publisher_ = self.create_publisher(DetectionResult, '/number_detected', 10)
         self.publisher_pos_ = self.create_publisher(DetectionResult, '/number_detected_pos', 10)
         self.cap = cv2.VideoCapture(video_path)
+        self.ret = False
+        self.timer = self.create_timer(0.05, self.process_frame)
+        self.get_logger().info(">>> Color tracker node has started")
+        
     
     def local_pos_ned_cb(self,msg):
         self.local_pos_ned=[msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]
     
+    def process_frame(self):
+        # ret, self.frame = self.cap.read()
+        if not self.ret:
+            self.get_logger().error("Failed to capture frame")
+            return
+        self.frame = self.img
+        # if self.rot == 180:
+        #     self.frame = cv2.rotate(self.frame, cv2.ROTATE_180)
+        hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
+        hsv_color = self.color_blue_hsv
+        lower_bound = np.array([hsv_color[0] - 10, hsv_color[1] - 45, 50])
+        upper_bound = np.array([hsv_color[0] + 10, hsv_color[1] + 45, 255])
+
+        mask = cv2.inRange(hsv_frame, lower_bound, upper_bound)
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            cv2.rectangle(self.frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            center_x = x + w // 2
+            center_y = y + h // 2
+            frame_width = self.frame.shape[1]
+            frame_height = self.frame.shape[0]
+
+            dx = frame_width  // 2 - center_x
+            dy = frame_height // 2 - center_y
+
+            # 创建并发布 Vector3 消息
+            msg = Vector3()
+            msg.x = float(dx)
+            msg.y = float(dy)
+            msg.z = 0.0  # z 轴值为 0
+            self.publisher.publish(msg)
+
+        cv2.imshow("Frame", self.frame)
+        
     def run(self):
         #-10s
         last_detect_time=time.time()-10.0
         consecutive_detect_num=0
         while rclpy.ok():
             try:
-                ret, img_src = self.cap.read()
+                self.ret, img_src = self.cap.read()
                 if img_src is None:
                     print("None frame")
                     time.sleep(1)
                     continue
                 if self.rot == 180:
                     img_src = cv2.rotate(img_src, cv2.ROTATE_180)
+                self.img = img_src
                 cv2.imshow("frame", img_src)
                 cv2.waitKey(1)
                 '''
@@ -335,6 +388,8 @@ class NumberDetector(Node):
                         # TODO 确认目标类型
                         # 不管啥类型都得发的！
                         if classes[i] in [0,1,2] :
+                            if scores[i] < 0.45:
+                                continue
                             if scores[i] == max(scores):
                                 # define the landing position
                                 # 停于目标下方（可以写死来规定哪家飞机停哪里）

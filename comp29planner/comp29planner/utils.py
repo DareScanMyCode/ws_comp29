@@ -7,10 +7,12 @@ class MissionState:
     MIS_FORMATION               = 10
     MIS_FORMATION_FOLLOW        = 11
     MIS_FORMATION_LEAVING       = 12
+    LOOKING_AROUND              = 13
     MIS_BASE                    = 20
     MIS_BASE_STAND              = 21
     MIS_BASE_MOVE               = 22
     MIS_TARGET_WATCHING         = 30
+    MIS_GOTO_GUARD              = 31
     MIS_LANDING                 = 40
 
 
@@ -89,3 +91,9 @@ class ColorCodes:
     white='\033[37m'
     reset='\033[0m'
     
+rend_tgt = {
+    1:2,
+    2:2,
+    3:3,
+    4:4
+}

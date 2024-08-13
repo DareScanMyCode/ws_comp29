@@ -16,6 +16,7 @@ from std_msgs.msg           import Float32MultiArray
 from quaternions            import Quaternion as Quaternion
 from geometry_msgs.msg      import TwistStamped
 from std_msgs.msg           import Int64, Float64
+from comp29planner.utils    import *
 
 class MovingAverageFilter:
     def __init__(self, window_size=10):
@@ -47,8 +48,7 @@ class RendNode(Node):
             history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
             depth=1                                    # 历史消息的队列长度
         )
-        self.vel_frd_pub            = self.create_publisher(TwistStamped,               '/vel_set_frd', qos_profile)
-        self.vel_ned_pub            = self.create_publisher(TwistStamped,               '/vel_set_ned', qos_profile)
+        self.guard_pos_est_ned      = self.create_publisher(PoseStamped,                '/guard_pos_est_ned', qos_profile)
         
         # 创建QoS配置文件
         qos_profile = QoSProfile(
@@ -58,21 +58,41 @@ class RendNode(Node):
 
             depth=1                                    # 历史消息的队列长度
         )
-        self.local_pos = [0,0]
-        self.local_pos_int = [0,0]
+        self.local_pos = [0., 0.]
+        self.local_pos_int = [0., 0.]
+        self.local_pos_fcu = [0., 0.]
+        
         self.local_pos_dists = []
         self.dist = 0
         self.dist_got = False
         self.pos_got = False
-        
+        self.fcu_pos_got = False
+        self.uav_id = int(os.environ.get('UAV_ID', '-1'))
+        if self.uav_id == -1:
+            self.get_logger.warn("[rend ctrler]UAV_ID未被设置！！！！")
+
+        self.exit_flag = False
+        if self.uav_id == rend_tgt[self.uav_id]:
+            self.exit_flag = True
         self.opt_pos_x_filter = MovingAverageFilter()
         self.opt_pos_y_filter = MovingAverageFilter()
         
+        ekf2_pos_topic_name = '/uav' + str(self.uav_id) + "/ekf2/pose"
+        
         # 创建订阅者并应用QoS配置
-        self.local_pos_sub        = self.create_subscription(
+        self.local_pos_ned_est_sub        = self.create_subscription(
             PoseStamped, 
+            # TODO 换成local_pos_est
+            ekf2_pos_topic_name, 
+            self.local_pos_ned_est_cb, 
+            qos_profile
+        )
+        
+        self.local_pos_ned_fcu_sub        = self.create_subscription(
+            PoseStamped, 
+            # TODO 换成local_pos_est
             '/local_position_ned', 
-            self.local_pos_cb, 
+            self.local_pos_ned_fcu_cb, 
             qos_profile
         )
         
@@ -97,14 +117,20 @@ class RendNode(Node):
         
     def dist_cb(self, msg:Float32MultiArray):
         # print(msg)
-        self.dist = msg.data[2*msg.layout.dim[0].size + 3]
+        self.dist = msg.data[self.uav_id*msg.layout.dim[0].size + rend_tgt[self.uav_id]]
         self.dist_got = True
         # print(11)
         pass
     
-    def local_pos_cb(self, msg: PoseStamped):
+    def local_pos_ned_est_cb(self, msg: PoseStamped):
         self.local_pos = [msg.pose.position.x, msg.pose.position.y]
         self.pos_got = True
+        # print(22)
+        pass
+    
+    def local_pos_ned_fcu_cb(self, msg: PoseStamped):
+        self.local_pos_fcu = [msg.pose.position.x, msg.pose.position.y]
+        self.fcu_pos_got = True
         # print(22)
         pass
     
@@ -121,7 +147,6 @@ class RendNode(Node):
             else:
                 print("waiting for msgs")
                 time.sleep(1)
-        v = 1
         p_star = np.array([0, 0])
         p_opt = np.array([5,5])
         p = np.array([0, 0])
@@ -130,9 +155,6 @@ class RendNode(Node):
         p_hat = p.copy()
         MAX_SIZE = 3000
         TIME_STEP = 0.1
-        MAX_SPD = 0.3
-        MIN_SPD = 0.1
-        MIN_DIST = 1.1
         his_p = np.zeros((MAX_SIZE, 2))
         his_p_hat = np.zeros((MAX_SIZE, 2))
         his_d = np.zeros(MAX_SIZE)
@@ -156,7 +178,6 @@ class RendNode(Node):
                 print("========================================================")
                 self.local_pos_dists = []
                 continue
-            time_begin = time.time()
             if len(self.local_pos_dists) > 200:
                 step = 99
                 # 随机取100个保留
@@ -185,35 +206,14 @@ class RendNode(Node):
             p0 = p_opt
             
             # 使用 scipy.optimize.minimize 求解优化问题
-            time_opt_begin = time.time()
             res = minimize(objective_function, p0, method='BFGS', options={'disp': False})
             p_opt = res.x
             p_opts[step, :] = p_opt
             
-            p_opt_filtered = np.array([self.opt_pos_x_filter.get_value(p_opt[0]), self.opt_pos_y_filter.get_value(p_opt[1])])
-            
-            p_now = np.array(hat_p[-1])
-            
-            if np.linalg.norm(p_now - p_opt_filtered) > MAX_SPD:
-                vv = ((p_opt_filtered - p_now) / np.linalg.norm(p_opt_filtered - p_now)) * MAX_SPD
-            else:
-                vv = p_opt_filtered - p_now
-            
-            if self.dist < MIN_DIST:
-                print(f"在第 xxx 步，距离小于 {MIN_DIST}")
-                print(p_now)
-                print(p_opt_filtered)
-                vv = [0.0,0.0]
-                # break
-            print(
-                f"s: {step:3d}, optp: [{p_opt_filtered[0]:6.2f}, {p_opt_filtered[1]:6.2f}], vset: [ {vv[0]:5.2f}, {vv[1]:5.2f}] "+
-                f"x-y-d: {self.local_pos_dists[-1][0]:5.2f}, {self.local_pos_dists[-1][1]:5.2f}, {self.local_pos_dists[-1][2]:4.2f} "+
-                f"t/o t: {(time.time()-time_begin)*1000 : 4.0f} /  {(time.time()-time_opt_begin)*1000 : 4.0f} ms"
-                )
-            vel_ned_msg = TwistStamped()
-            vel_ned_msg.twist.linear.x = vv[0] if math.fabs(vv[0]) > MIN_SPD else 0.0
-            vel_ned_msg.twist.linear.y = vv[1] if math.fabs(vv[1]) > MIN_SPD else 0.0
-            self.vel_ned_pub.publish(vel_ned_msg)
+            pos_opt_msg = PoseStamped()
+            pos_opt_msg.position.x = self.opt_pos_x_filter.get_value(p_opt[0])
+            pos_opt_msg.position.y = self.opt_pos_y_filter.get_value(p_opt[1])
+            self.guard_pos_est_ned.publish(pos_opt_msg)
             rclpy.spin_once(self)
             time.sleep(0.1)
             
@@ -224,10 +224,13 @@ def main(args=None):
     rend_node = RendNode(args)
     
     try:
-        rend_node.run()
+        if rclpy.ok() and not rend_node.exit_flag:
+            rend_node.run()
+        else:
+            rend_node.get_logger().info(f"{ColorCodes.red}[rend] 测量位置目标为自身，进程结束{ColorCodes.reset}")
     finally:
-        print("UAV 线程结束")
-        rclpy.shutdown()
+        print("REND 线程结束")
+        # rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

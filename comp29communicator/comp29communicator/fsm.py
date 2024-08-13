@@ -140,6 +140,7 @@ class fsm():
                 try:
                     data_recv_t = self.Unpack_Info(data_addr_t[0], is_debugging=self.is_debugging)
                 except:
+                    print("[fsm] udp received data error ...")
                     pass
                 if False:
                     print("[fsm] udp received: ")
@@ -172,14 +173,16 @@ class fsm():
             try:
                 for i in range(0, self.swarm_num):
                     self.neighbor_dist_list[i] = dist_list[i]
-            except:
+            except Exception as e:
+                print(e.__str__())
                 print("[fsm] neighboring list updating error ...")
         if adjacency_mat != None:
             try:
                 for i in range(0, self.swarm_num):
                     for j in range(0, self.swarm_num):
                         self.adjacency_mat[i, j] = adjacency_mat[i, j]
-            except:
+            except Exception as e:
+                print(e.__str__())
                 print("[fsm] adjacency matrix updating error ...")
         if pos != None:
             self.pos_xyz[0] = pos[0]
@@ -190,24 +193,31 @@ class fsm():
             self.lon = latlon[1]            
         if tgt != None:
             try:
-                self.tgt_list.sort(key=functools.cmp_to_key(self.sort_tgt_list_guard_list), reverse=True)      # 做了这一步以后, identified, i.e., -1, 一定在最后
-                tmp = self.tgt_list.copy()
-                for i in range(0, self.known_target_num):
-                    if self.tgt_list[i][0] == tgt[0]:
-                        # update
-                        alpha = 0.33
-                        # x
-                        self.tgt_list[i][1] = (1. - alpha) *  self.tgt_list[i][1] + alpha * tgt[1]           # lpf
-                        # y
-                        self.tgt_list[i][2] = (1. - alpha) *  self.tgt_list[i][2] + alpha * tgt[2]
-                        break
-                    elif self.tgt_list[i][0] == -1:
-                        self.tgt_list[i][0] = tgt[0]
-                        self.tgt_list[i][1] = tgt[1] 
-                        self.tgt_list[i][2] = tgt[2] 
-                        break
-                # print(f"local received updated from {tmp} to {self.tgt_list}")
-            except:
+                # self.tgt_list.sort(key=functools.cmp_to_key(self.sort_tgt_list_guard_list), reverse=True)      # 做了这一步以后, identified, i.e., -1, 一定在最后
+                i = int(tgt[0])-1
+                self.tgt_list[i][0] = int(tgt[0])
+                self.tgt_list[i][1] = self.pos_xyz[0]                # tgt.position.x
+                self.tgt_list[i][2] = self.pos_xyz[1]                # tgt.position.y
+                # for i in range(0, self.known_target_num):
+                #     if self.tgt_list[i][0] == int(tgt[0]):                  # int(tgt.object_name.data)
+                #         # update
+                #         alpha = 0.33
+                #         # x
+                #         self.tgt_list[i][1] = (1. - alpha) *  self.tgt_list[i][1] + alpha * tgt[1]  # tgt.position.x            # lpf
+                #         # y
+                #         self.tgt_list[i][2] = (1. - alpha) *  self.tgt_list[i][2] + alpha * tgt[2]  # tgt.position.y
+                #         # TODO 从像素坐标改成了飞机坐标
+                #         self.tgt_list[i][1] = self.pos_xyz[0]                # tgt.position.x
+                #         self.tgt_list[i][2] = self.pos_xyz[1]                # tgt.position.y
+                #         break
+                #     elif self.tgt_list[i][0] == -1:
+                #         self.tgt_list[i][0] = int(tgt[0])           # int(tgt.object_name.data)
+                #         # TODO 从像素坐标改成了飞机坐标
+                #         self.tgt_list[i][1] = self.pos_xyz[0]                # tgt.position.x
+                #         self.tgt_list[i][2] = self.pos_xyz[1]                # tgt.position.y
+                #         break
+            except Exception as e:
+                print(e.__str__())
                 print("[fsm] target list updating error ...")
         if guard_list != None:
             try:

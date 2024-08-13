@@ -38,6 +38,13 @@ class Leader:
     
     def get_ctrl(self, dist=None, dx=None):
         pass
+    
+    def update_tgt_pos(self, new_pos):
+        return
+        # self.tgt_pos = new_pos if isinstance(new_pos, np.ndarray) else np.array(new_pos)
+        # self.tgt_pos_local = self.tgt_pos-self.tgt_pos[self.index_id]
+        # self.tgt_dist = np.linalg.norm(self.tgt_pos_local, axis=1)
+        # self.dist_only_agent.update_tgt_pos(new_pos=new_pos)
 
     
 class AngleLeader:
@@ -100,8 +107,8 @@ class Follower:
         self.tgt_pos = tgt_pos if isinstance(tgt_pos, np.ndarray) else np.array(tgt_pos)
         self.tgt_pos_local = self.tgt_pos-self.tgt_pos[self.index_id]
         self.tgt_dist = np.linalg.norm(self.tgt_pos_local, axis=1)
-        print(self.tgt_pos_local)
-        print(self.tgt_dist)
+        # print(self.tgt_pos_local)
+        # print(self.tgt_dist)
         self.k_dist = k_dist
         pass
     
@@ -109,7 +116,7 @@ class Follower:
         self.adj_mtx = new_adj
         
     def update_tgt_pos(self, new_pos):
-        self.tgt_pos = new_pos if isinstance(new_pos, np.array) else np.array(new_pos)
+        self.tgt_pos = new_pos if isinstance(new_pos, np.ndarray) else np.array(new_pos)
         self.tgt_pos_local = self.tgt_pos-self.tgt_pos[self.index_id]
         self.tgt_dist = np.linalg.norm(self.tgt_pos_local, axis=1)
         

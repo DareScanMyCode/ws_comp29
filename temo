@@ -1,0 +1,587 @@
+>>> 检查环境变量
+UAV_ID 当前值为  2 
+ROS_DOMAIN_ID 当前值为  2 
+>>> 设置ROS 2 日志格式
+>>> ROS 2 日志格式已设置为仅包括节点名称、时间和消息类型。
+>>> 设置DISPLAY=:0
+>>> 设置ROS_LOCALHOST_ONLY=1
+>>> 构建与source
+Starting >>> comp29communicator
+Starting >>> comp29detector
+Starting >>> comp29hardware
+Starting >>> comp29localization
+Starting >>> comp29msg
+Starting >>> comp29planner
+Finished <<< comp29detector [3.39s]                                                      
+Finished <<< comp29communicator [3.44s]                                                  
+Finished <<< comp29hardware [3.44s]
+Finished <<< comp29msg [3.50s]
+Finished <<< comp29localization [3.59s]                                             
+Finished <<< comp29planner [3.80s]          
+                     
+Summary: 6 packages finished [4.29s]
+>>>启动硬件节点
+[INFO] [launch]: All log files can be found below /home/cat/.ros/log/2024-08-13-23-15-48-350146-lubancat2-14870
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [uwb2ros2-1]: process started with pid [14871]
+[INFO] [gport2ros2-2]: process started with pid [14873]
+[INFO] [uav2ros2-3]: process started with pid [14875]
+[INFO] [number_detect-4]: process started with pid [14877]
+[INFO] [ekf2_main-5]: process started with pid [14879]
+[INFO] [rcl_fsm_main-6]: process started with pid [14881]
+[INFO] [comp29main-7]: process started with pid [14883]
+[uwb2ros2-1] /home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/NoopLoopUwb/handle_uwb.py:3: UserWarning: UWB version: 0.1.0, this version is not compatible with the previous version.
+[uwb2ros2-1]   warnings.warn(f"UWB version: {VERSION}, this version is not compatible with the previous version.")
+[uwb2ros2-1] [INFO] [1723562149.198749351]: Using port: /dev/ttyS4
+[uwb2ros2-1] [INFO] [1723562149.201414658]: Publishing UWB raw data to: uwb_raw
+[uwb2ros2-1] [INFO] [1723562149.203379152]: Publishing UWB filtered data to: uwb_filtered
+[gport2ros2-2] [INFO] [1723562149.545191456]: Using port: /dev/ttyS7
+[gport2ros2-2] [INFO] [1723562149.547394513]: Publishing   gimbal rpy       data to: gimbalrpy_data
+[gport2ros2-2] [INFO] [1723562149.549420543]: Publishing   gimbal imu rpy   data to: gimbalimu_data
+[gport2ros2-2] [INFO] [1723562149.554093507]: gimbal thread begin @ 5 FPS
+[comp29main-7] [INFO] [1723562149.660020438]: Config file /home/cat/ws_comp29/src/configs/missionCFG.json loaded successfully.
+[comp29main-7] [INFO] [1723562149.660568723]: >>> ============ MISSION CONFIG BEGIN ============
+[comp29main-7] [INFO] [1723562149.660996852]: map_discription: 地图参数设置
+[comp29main-7] [INFO] [1723562149.661394067]: MAP_W: 10
+[comp29main-7] [INFO] [1723562149.661779325]: MAP_L: 50
+[comp29main-7] [INFO] [1723562149.662163416]: MAP_ANGLE: 0
+[comp29main-7] [INFO] [1723562149.662570838]: DX_PER_LINE: 4
+[comp29main-7] [INFO] [1723562149.662958138]: Formation_discription: 无人机集群设置
+[comp29main-7] [INFO] [1723562149.663341354]: NUM_UAV: 4
+[comp29main-7] [INFO] [1723562149.663722820]: LEADER_ID: 1
+[comp29main-7] [INFO] [1723562149.664101954]: ANGLE_LEADER_ID: 2
+[comp29main-7] [INFO] [1723562149.664486628]: HERIZON_space: 3.0
+[comp29main-7] [INFO] [1723562149.664874802]: GROUP_1: [1, 2]
+[comp29main-7] [INFO] [1723562149.665254519]: GROUP_2: [3, 5, 6]
+[comp29main-7] [INFO] [1723562149.665633069]: GROUP_3: [4, 8]
+[comp29main-7] [INFO] [1723562149.666036117]: UAV_discription: 无人机参数设置
+[comp29main-7] [INFO] [1723562149.666429249]: UAV_SPEED: 2.0
+[comp29main-7] [INFO] [1723562149.666811590]: UAV_MAX_SPEED: 2.5
+[comp29main-7] [INFO] [1723562149.667190724]: FLIGHT_HEIGHT: 0.9
+[comp29main-7] [INFO] [1723562149.667568982]: MIN_DIST: 0.5
+[comp29main-7] [INFO] [1723562149.667945491]: POS_discription: 无人机初始位置，坐标系为xxx
+[comp29main-7] [INFO] [1723562149.668325499]: INITIAL_POS:
+[comp29main-7] [INFO] [1723562149.668709298]:   UAV1: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.669089598]:   UAV2: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.669521810]:   UAV3: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.669928066]:   UAV4: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.670313907]:   UAV5: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.670693041]:   UAV6: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.671071591]:   UAV7: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.671449557]:   UAV8: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.671829274]: COMM_PORT: 25001
+[comp29main-7] [INFO] [1723562149.672206074]: TARGET_NUM: 3
+[comp29main-7] [INFO] [1723562149.672614080]: >>> ============= MISSION CONFIG END =============
+[comp29main-7] [WARN] [1723562149.673105495]:  UAV2 被分组为 1
+[comp29main-7] [INFO] [1723562149.673505918]: INITIAL_POS: [0.0, 0.0]
+[comp29main-7] [INFO] [1723562149.673888843]:  UAV ID 2 
+[comp29main-7] [INFO] [1723562149.674270309]: DO NOT USE EKF position.
+[comp29main-7] [INFO] [1723562149.674653234]: >>>  UAV 2 被配置为 ANGLE LEADER 
+[comp29main-7] [INFO] [1723562149.692938250]: 主程序准备好了
+[comp29main-7] [INFO] [1723562149.694590397]: [MAIN] 主线程开始
+[uav2ros2-3] [INFO] [1723562149.708207699]: 使用环境变量作为UAV ID: 2
+[uav2ros2-3] [INFO] [1723562149.708742860]: 使用环境变量指定config file: 2
+[uav2ros2-3] None
+[uav2ros2-3] udp
+[uav2ros2-3] 飞控连接成功@/dev/ttyS0 921600
+[uav2ros2-3] FCU connected@/dev/ttyS0 921600
+[uav2ros2-3] 打开udpout网口成功@udpout:192.168.151.168:52002
+[uav2ros2-3] GCS connected@udpout:192.168.151.168:52002
+[uav2ros2-3] 打开udpin网口成功@udpin:192.168.151.202:52000
+[uav2ros2-3] 连接初始化完成
+[uav2ros2-3] begin to trans from fcu
+[rcl_fsm_main-6] [INFO] [1723562149.812041814]: Config file /home/cat/ws_comp29/src/configs/missionCFG.json loaded successfully.
+[comp29main-7] [INFO] [1723562149.874654514]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[ekf2_main-5] [INFO] [1723562149.910559314]: Config file /home/cat/ws_comp29/src/configs/missionCFG.json loaded successfully.
+[comp29main-7] [INFO] [1723562150.030147876]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.186319009]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.187609812]: [MAIN]   mis sta 10 vFRD: 0.30, 0.00, 0.00 
+[comp29main-7] [INFO] [1723562150.293246559]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.464274177]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.622772606]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.727735662]: [MAIN]   mis sta 10 vFRD: 0.30, 0.00, 0.00 
+[comp29main-7] [INFO] [1723562150.832053899]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562150.989631618]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562151.147110759]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[uav2ros2-3] [INFO] [1723562151.235246710]: FCU配置完成
+[uav2ros2-3] [INFO] [1723562151.235853615]: Using config file: /home/cat/ws_comp29/src/configs/UAV_configs/config2.json
+[uav2ros2-3] [INFO] [1723562151.236290202]: pub fps: 20.0
+[comp29main-7] [INFO] [1723562151.253349742]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562151.254615756]: [MAIN]   mis sta 10 vFRD: 0.30, 0.00, 0.00 
+[comp29main-7] [INFO] [1723562151.411637895]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[ekf2_main-5] [INFO] [1723562151.426726817]: [ekf2] waiting for imu data ...
+[number_detect-4] [INFO] [1723562151.534459878]: >>> [Color] Camera config: w:1920, h:1080, fps:30, rot:180
+[number_detect-4] [INFO] [1723562151.748987498]: >>> Color tracker node has started
+[comp29main-7] [INFO] [1723562151.778151307]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562151.891654484]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562152.323563135]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562152.327259685]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562152.743293148]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562152.846346244]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562153.218261712]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562153.385301131]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[ekf2_main-5] [ekf2 uwb] Initialized success, UAV id: 2, swarm num: 4 ...
+[ekf2_main-5] [ekf2] Data Received, Starting EKF ...
+[ekf2_main-5] [ekf2] Initial Params: [ 0.          0.          0.          0.          0.          0.
+[ekf2_main-5]   0.17075251 -0.98474687  0.01988184 -0.02686795]
+[ekf2_main-5] [FCU velocity] timing gap too large: 1723562152.734972, aborting once...
+[ekf2_main-5] [EKF prediction] timing gap too large: 1.325262, aborting once...
+[ekf2_main-5] Traceback (most recent call last):
+[ekf2_main-5]   File "/home/cat/ws_comp29/install/comp29localization/lib/comp29localization/ekf2_main", line 33, in <module>
+[ekf2_main-5]     sys.exit(load_entry_point('comp29localization==0.0.0', 'console_scripts', 'ekf2_main')())
+[ekf2_main-5]   File "/home/cat/ws_comp29/install/comp29localization/lib/python3.10/site-packages/comp29localization/ekf2_main.py", line 1334, in main
+[ekf2_main-5]     if dist_list_t[j] != 0:
+[ekf2_main-5] IndexError: array index out of range
+[comp29main-7] [INFO] [1723562153.698330198]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[ERROR] [ekf2_main-5]: process has died [pid 14879, exit code 1, cmd '/home/cat/ws_comp29/install/comp29localization/lib/comp29localization/ekf2_main --ros-args -r __node:=ekf2_main_w_uwb'].
+[comp29main-7] [INFO] [1723562153.904410138]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562154.212527384]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562154.417503752]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562154.624020567]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[rcl_fsm_main-6] [INFO] [1723562154.841864718]: [fsm flow monitor] In_rate: {'lo': 92370.4, 'eth0': 0.0, 'wlan0': 11824.6}    Out_rate: {'lo': 92370.4, 'eth0': 0.0, 'wlan0': 30211.6} 
+[comp29main-7] [INFO] [1723562154.930987579]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562155.087761523]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562155.448667238]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562155.501756979]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562155.963583015]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562155.964672877]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562156.375761250]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562156.478943828]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562156.838430704]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562156.994607072]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562157.252449772]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562157.508267609]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562157.663592383]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562158.057597878]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562158.172584913]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562158.597637333]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562158.598611706]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562159.066308742]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562159.120999589]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562159.498305128]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562159.658692492]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562160.042686232]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562160.255813362]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562160.476366545]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562160.809673081]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[rcl_fsm_main-6] [INFO] [1723562160.850565810]: [fsm flow monitor] In_rate: {'lo': 47988.0, 'eth0': 0.0, 'wlan0': 11642.8}    Out_rate: {'lo': 47988.0, 'eth0': 0.0, 'wlan0': 28206.4} 
+[comp29main-7] [INFO] [1723562160.969190479]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562161.377673007]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562161.443572489]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562161.938991727]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562161.942044333]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562162.401128893]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562162.518643281]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562162.966991079]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562163.147288761]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562163.444655784]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562163.708140546]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562163.954221343]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562164.292145118]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562164.415646307]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562164.876249135]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562164.941776480]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562165.407259621]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562165.462984329]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562165.933271670]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562166.041212646]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562166.404010465]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562166.625127662]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[rcl_fsm_main-6] [INFO] [1723562166.859513937]: [fsm flow monitor] In_rate: {'lo': 9574.4, 'eth0': 0.0, 'wlan0': 12606.6}    Out_rate: {'lo': 9574.4, 'eth0': 0.0, 'wlan0': 27950.4} 
+[comp29main-7] [INFO] [1723562166.896754151]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562167.182082220]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562167.365015741]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562167.770592612]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562167.890714552]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562168.363232051]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562168.366264825]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562168.890976715]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562168.946442736]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562169.351517390]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562169.519709332]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562169.882081046]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562170.109809730]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562170.354763308]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562170.698077450]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.30 
+[comp29main-7] [INFO] [1723562170.888106586]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562171.293658936]: [MAIN]   mis sta 10 vNED: 0.30, 0.00, -0.28 
+[comp29main-7] [INFO] [1723562171.358310476]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562171.890646710]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562171.893991540]: [MAIN]   mis sta 10 vNED: 0.31, 0.00, -0.21 
+[comp29main-7] [INFO] [1723562172.364196006]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562172.474607169]: [MAIN]   mis sta 10 vNED: 0.30, -0.02, -0.05 
+[rcl_fsm_main-6] [INFO] [1723562172.868529163]: [fsm flow monitor] In_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 12034.8}    Out_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 27831.4} 
+[comp29main-7] [INFO] [1723562172.903078695]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562173.072025395]: [MAIN]   mis sta 10 vNED: 0.30, -0.04, 0.02 
+[comp29main-7] [INFO] [1723562173.378554271]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562173.669345329]: [MAIN]   mis sta 10 vNED: 0.30, -0.05, 0.11 
+[comp29main-7] [INFO] [1723562173.917506654]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562174.260019930]: [MAIN]   mis sta 10 vNED: 0.30, -0.03, 0.12 
+[comp29main-7] [INFO] [1723562174.388620441]: target update: array('f', [-1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562174.851224146]: [MAIN]   mis sta 10 vNED: 0.30, -0.03, 0.12 
+[comp29main-7] [INFO] [1723562174.919881954]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562174.921733582]: ***********change my state************
+[comp29main-7] [INFO] [1723562174.924350768]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562176.041041698]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562177.032527387]: ***********i can see************
+[uav2ros2-3] [INFO] [1723562177.241055284]: 速度信号恢复
+[comp29main-7] [INFO] [1723562177.439616062]: [MAIN]   mis sta 30 vNED: 0.17, 0.18, 0.10 
+[comp29main-7] [INFO] [1723562177.509936511]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562177.511887589]: ***********change my state************
+[comp29main-7] [INFO] [1723562177.513913326]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562178.441734372]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562178.881240966]: [fsm flow monitor] In_rate: {'lo': 9548.0, 'eth0': 0.0, 'wlan0': 12028.8}    Out_rate: {'lo': 9548.0, 'eth0': 0.0, 'wlan0': 27253.8} 
+[uav2ros2-3] [INFO] [1723562179.641059351]: 速度信号恢复
+[comp29main-7] [INFO] [1723562179.939166778]: DETECT SIGNAL LOST
+[comp29main-7] [INFO] [1723562180.078443084]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562180.080601518]: ***********change my state************
+[comp29main-7] [INFO] [1723562180.082627547]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562181.241116066]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562182.089293441]: [MAIN]   mis sta 13 vNED: 0.00, 0.07, 0.10 
+[uav2ros2-3] [INFO] [1723562182.441021067]: 速度信号恢复
+[comp29main-7] [INFO] [1723562182.636271706]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562182.637718828]: ***********change my state************
+[comp29main-7] [INFO] [1723562182.638767569]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562183.641699479]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562184.693214656]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.06 
+[uav2ros2-3] [INFO] [1723562184.841222680]: 速度信号恢复
+[rcl_fsm_main-6] [INFO] [1723562184.906470904]: [fsm flow monitor] In_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 12337.2}    Out_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 27286.8} 
+[comp29main-7] [INFO] [1723562185.107601015]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562185.108143176]: ***********change my state************
+[comp29main-7] [INFO] [1723562185.108752122]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562186.443302963]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562187.211794079]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, -0.11 
+[uav2ros2-3] [INFO] [1723562187.241071319]: 速度信号恢复
+[comp29main-7] [INFO] [1723562187.577066354]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562187.577569143]: ***********change my state************
+[comp29main-7] [INFO] [1723562187.578079514]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562188.841045608]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562189.640985492]: 速度信号恢复
+[comp29main-7] [INFO] [1723562189.737508399]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.03 
+[comp29main-7] [INFO] [1723562190.075551908]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562190.076078028]: ***********change my state************
+[comp29main-7] [INFO] [1723562190.076603856]: ***********i'm leaving************
+[rcl_fsm_main-6] [INFO] [1723562190.917302864]: [fsm flow monitor] In_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 12835.2}    Out_rate: {'lo': 9600.8, 'eth0': 0.0, 'wlan0': 27138.0} 
+[uav2ros2-3] [INFO] [1723562191.252131025]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562192.283139651]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.06 
+[uav2ros2-3] [INFO] [1723562192.440892252]: 速度信号恢复
+[comp29main-7] [INFO] [1723562192.542930957]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562192.545479315]: ***********change my state************
+[comp29main-7] [INFO] [1723562192.547560755]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562193.641109692]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562194.803324855]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.01 
+[uav2ros2-3] [INFO] [1723562194.842586708]: 速度信号恢复
+[comp29main-7] [INFO] [1723562195.018516400]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562195.019040770]: ***********change my state************
+[comp29main-7] [INFO] [1723562195.019566890]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562196.041207956]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562196.930390130]: [fsm flow monitor] In_rate: {'lo': 9996.8, 'eth0': 0.0, 'wlan0': 12490.2}    Out_rate: {'lo': 9996.8, 'eth0': 0.0, 'wlan0': 28979.6} 
+[uav2ros2-3] [INFO] [1723562197.243429195]: 速度信号恢复
+[comp29main-7] [INFO] [1723562197.368643420]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.05 
+[comp29main-7] [INFO] [1723562197.548574125]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562197.549051541]: ***********change my state************
+[comp29main-7] [INFO] [1723562197.549573287]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562198.841028708]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562199.645891079]: 速度信号恢复
+[comp29main-7] [INFO] [1723562199.918658915]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.07 
+[comp29main-7] [INFO] [1723562200.022638188]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562200.024117390]: ***********change my state************
+[comp29main-7] [INFO] [1723562200.024653134]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562201.250288975]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562202.042210343]: 速度信号恢复
+[comp29main-7] [INFO] [1723562202.450810441]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.04 
+[comp29main-7] [INFO] [1723562202.514316386]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562202.516494359]: ***********change my state************
+[comp29main-7] [INFO] [1723562202.518682831]: ***********i'm leaving************
+[rcl_fsm_main-6] [INFO] [1723562202.936777003]: [fsm flow monitor] In_rate: {'lo': 9785.6, 'eth0': 0.0, 'wlan0': 13104.4}    Out_rate: {'lo': 9785.6, 'eth0': 0.0, 'wlan0': 28198.4} 
+[uav2ros2-3] [INFO] [1723562203.658044290]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562204.841091184]: 速度信号恢复
+[comp29main-7] [INFO] [1723562204.983586862]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562204.984159061]: ***********change my state************
+[comp29main-7] [INFO] [1723562204.984664475]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562206.041054388]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562206.987739825]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.06 
+[uav2ros2-3] [INFO] [1723562207.241040318]: 速度信号恢复
+[comp29main-7] [INFO] [1723562207.453531520]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562207.454024977]: ***********change my state************
+[comp29main-7] [INFO] [1723562207.456482633]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562208.458498425]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562208.945213879]: [fsm flow monitor] In_rate: {'lo': 9891.2, 'eth0': 0.0, 'wlan0': 12801.6}    Out_rate: {'lo': 9891.2, 'eth0': 0.0, 'wlan0': 28469.2} 
+[comp29main-7] [INFO] [1723562209.510421808]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.07 
+[uav2ros2-3] [INFO] [1723562209.641288301]: 速度信号恢复
+[comp29main-7] [INFO] [1723562209.931046213]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562209.934352253]: ***********change my state************
+[comp29main-7] [INFO] [1723562209.934954491]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562211.241195865]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562212.041055872]: 速度信号恢复
+[comp29main-7] [INFO] [1723562212.044041398]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.08 
+[comp29main-7] [INFO] [1723562212.406992663]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562212.407492244]: ***********change my state************
+[comp29main-7] [INFO] [1723562212.408008740]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562213.641169861]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562214.441313313]: 速度信号恢复
+[comp29main-7] [INFO] [1723562214.600085731]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.08 
+[comp29main-7] [INFO] [1723562214.940887457]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562214.941380913]: ***********change my state************
+[comp29main-7] [INFO] [1723562214.942007649]: ***********i'm leaving************
+[rcl_fsm_main-6] [INFO] [1723562214.952477551]: [fsm flow monitor] In_rate: {'lo': 10859.2, 'eth0': 0.0, 'wlan0': 12217.6}    Out_rate: {'lo': 10859.2, 'eth0': 0.0, 'wlan0': 30234.0} 
+[uav2ros2-3] [INFO] [1723562216.041746889]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562217.148246051]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.08 
+[uav2ros2-3] [INFO] [1723562217.252892280]: 速度信号恢复
+[comp29main-7] [INFO] [1723562217.405084985]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562217.405556860]: ***********change my state************
+[comp29main-7] [INFO] [1723562217.406076855]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562218.441075611]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562219.641181195]: 速度信号恢复
+[comp29main-7] [INFO] [1723562219.663309433]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.08 
+[comp29main-7] [INFO] [1723562219.869863086]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562219.870318046]: ***********change my state************
+[comp29main-7] [INFO] [1723562219.870894328]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562220.841708763]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562220.959738962]: [fsm flow monitor] In_rate: {'lo': 10964.8, 'eth0': 0.0, 'wlan0': 11972.4}    Out_rate: {'lo': 10964.8, 'eth0': 0.0, 'wlan0': 30694.2} 
+[uav2ros2-3] [INFO] [1723562222.041402219]: 速度信号恢复
+[comp29main-7] [INFO] [1723562222.178361937]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.06 
+[comp29main-7] [INFO] [1723562222.333742264]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562222.334207431]: ***********change my state************
+[comp29main-7] [INFO] [1723562222.334699137]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562223.641037400]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562224.440874227]: 速度信号恢复
+[comp29main-7] [INFO] [1723562224.692673584]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.06 
+[comp29main-7] [INFO] [1723562224.796713190]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562224.797178940]: ***********change my state************
+[comp29main-7] [INFO] [1723562224.797677354]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562226.044012254]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562226.844052618]: 速度信号恢复
+[rcl_fsm_main-6] [INFO] [1723562226.967931661]: [fsm flow monitor] In_rate: {'lo': 10278.4, 'eth0': 0.0, 'wlan0': 12354.8}    Out_rate: {'lo': 10278.4, 'eth0': 0.0, 'wlan0': 28032.6} 
+[comp29main-7] [INFO] [1723562227.207160129]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, 0.06 
+[comp29main-7] [INFO] [1723562227.260197901]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562227.260660735]: ***********change my state************
+[comp29main-7] [INFO] [1723562227.261170231]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562228.457673905]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562229.640960696]: 速度信号恢复
+[comp29main-7] [INFO] [1723562229.741789039]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562229.742285412]: ***********change my state************
+[comp29main-7] [INFO] [1723562229.744193908]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562230.843463964]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562231.747063538]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, -0.01 
+[uav2ros2-3] [INFO] [1723562232.041198887]: 速度信号恢复
+[comp29main-7] [INFO] [1723562232.209085618]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562232.213485309]: ***********change my state************
+[comp29main-7] [INFO] [1723562232.214108545]: ***********i'm leaving************
+[rcl_fsm_main-6] [INFO] [1723562232.977067026]: [fsm flow monitor] In_rate: {'lo': 10384.0, 'eth0': 0.0, 'wlan0': 12308.2}    Out_rate: {'lo': 10384.0, 'eth0': 0.0, 'wlan0': 28395.4} 
+[uav2ros2-3] [INFO] [1723562233.241157256]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562234.268236867]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, -0.06 
+[uav2ros2-3] [INFO] [1723562234.441397915]: 速度信号恢复
+[comp29main-7] [INFO] [1723562234.687961997]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562234.688428622]: ***********change my state************
+[comp29main-7] [INFO] [1723562234.688914495]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562235.641556021]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562236.793642398]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.07 
+[uav2ros2-3] [INFO] [1723562236.841017961]: 速度信号恢复
+[comp29main-7] [INFO] [1723562237.184858767]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562237.185423967]: ***********change my state************
+[comp29main-7] [INFO] [1723562237.185948045]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562238.441026701]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562238.986700021]: [fsm flow monitor] In_rate: {'lo': 9970.4, 'eth0': 0.0, 'wlan0': 12405.4}    Out_rate: {'lo': 9970.4, 'eth0': 0.0, 'wlan0': 28610.2} 
+[uav2ros2-3] [INFO] [1723562239.252843963]: 速度信号恢复
+[comp29main-7] [INFO] [1723562239.347325025]: [MAIN]   mis sta 13 vNED: 0.00, 0.22, 0.04 
+[comp29main-7] [INFO] [1723562239.658408745]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562239.658920866]: ***********change my state************
+[comp29main-7] [INFO] [1723562239.659460110]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562240.853455473]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562241.877548578]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, -0.13 
+[uav2ros2-3] [INFO] [1723562242.046007196]: 速度信号恢复
+[comp29main-7] [INFO] [1723562242.134861341]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562242.135386878]: ***********change my state************
+[comp29main-7] [INFO] [1723562242.135966951]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562243.254295826]: 长时间未收到消息，设置速度为零
+[comp29main-7] [INFO] [1723562244.393456864]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, -0.11 
+[uav2ros2-3] [INFO] [1723562244.441099565]: 速度信号恢复
+[comp29main-7] [INFO] [1723562244.600724966]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562244.601209673]: ***********change my state************
+[comp29main-7] [INFO] [1723562244.601720336]: ***********i'm leaving************
+[rcl_fsm_main-6] [INFO] [1723562244.993296549]: [fsm flow monitor] In_rate: {'lo': 9970.4, 'eth0': 0.0, 'wlan0': 12646.8}    Out_rate: {'lo': 9970.4, 'eth0': 0.0, 'wlan0': 28526.6} 
+[uav2ros2-3] [INFO] [1723562245.641519694]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562246.841127876]: 速度信号恢复
+[comp29main-7] [INFO] [1723562246.913655393]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, -0.10 
+[comp29main-7] [INFO] [1723562247.070544033]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562247.072173721]: ***********change my state************
+[comp29main-7] [INFO] [1723562247.072818247]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562248.058906123]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562249.241571406]: 速度信号恢复
+[comp29main-7] [INFO] [1723562249.431761605]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, -0.10 
+[comp29main-7] [INFO] [1723562249.535880501]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562249.536403413]: ***********change my state************
+[comp29main-7] [INFO] [1723562249.537902737]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562250.841044430]: 长时间未收到消息，设置速度为零
+[rcl_fsm_main-6] [INFO] [1723562251.000097036]: [fsm flow monitor] In_rate: {'lo': 9627.2, 'eth0': 0.0, 'wlan0': 12579.6}    Out_rate: {'lo': 9627.2, 'eth0': 0.0, 'wlan0': 27327.0} 
+[uav2ros2-3] [INFO] [1723562251.657175212]: 速度信号恢复
+[comp29main-7] [INFO] [1723562251.963341238]: [MAIN]   mis sta 13 vNED: 0.00, 0.30, -0.09 
+[comp29main-7] [INFO] [1723562252.016333206]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562252.016838327]: ***********change my state************
+[comp29main-7] [INFO] [1723562252.018434184]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562253.241327722]: 长时间未收到消息，设置速度为零
+[uav2ros2-3] [INFO] [1723562254.042962194]: 速度信号恢复
+[comp29main-7] [INFO] [1723562254.484592918]: target update: array('f', [2.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]) 
+[comp29main-7] [INFO] [1723562254.485129828]: ***********change my state************
+[comp29main-7] [INFO] [1723562254.485685695]: ***********i'm leaving************
+[uav2ros2-3] [INFO] [1723562255.641039615]: 长时间未收到消息，设置速度为零
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[uwb2ros2-1] None
+[uwb2ros2-1] <class 'int'>
+[uwb2ros2-1] <class 'int'>
+[uwb2ros2-1] <class 'int'>
+[uwb2ros2-1] 任务结束
+[gport2ros2-2] None
+[uav2ros2-3] UAV 线程结束
+[comp29main-7] Traceback (most recent call last):
+[comp29main-7]   File "/home/cat/ws_comp29/install/comp29planner/lib/comp29planner/comp29main", line 33, in <module>
+[comp29main-7]     sys.exit(load_entry_point('comp29planner==0.0.0', 'console_scripts', 'comp29main')())
+[comp29main-7]   File "/home/cat/ws_comp29/install/comp29planner/lib/python3.10/site-packages/comp29planner/comp29planner_main.py", line 989, in main
+[comp29main-7]     formation_node.run()
+[comp29main-7]   File "/home/cat/ws_comp29/install/comp29planner/lib/python3.10/site-packages/comp29planner/comp29planner_main.py", line 872, in run
+[comp29main-7]     vv_ned = self.formation_leaving()
+[comp29main-7]   File "/home/cat/ws_comp29/install/comp29planner/lib/python3.10/site-packages/comp29planner/comp29planner_main.py", line 678, in formation_leaving
+[comp29main-7]     time.sleep(2.0) # 等其他人先走一走
+[comp29main-7] KeyboardInterrupt
+[rcl_fsm_main-6] [INFO] [1723562255.780750609]: [fsm] 服务器正在关闭...
+[rcl_fsm_main-6] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:389
+[number_detect-4] E Catch exception when setting inputs.
+[number_detect-4] E Traceback (most recent call last):
+[number_detect-4]   File "/home/cat/.local/lib/python3.10/site-packages/rknnlite/api/rknn_lite.py", line 201, in inference
+[number_detect-4]     self.rknn_runtime.set_inputs(inputs, data_type, data_format, inputs_pass_through=inputs_pass_through)
+[number_detect-4] KeyboardInterrupt
+[number_detect-4] 
+[number_detect-4] --> Init runtime environment
+[number_detect-4] done
+[number_detect-4] Model-/home/cat/ws_comp29/src/weights/best123.rknn is rknn model, starting val
+[number_detect-4] I RKNN: [23:15:51.402] RKNN Runtime Information, librknnrt version: 2.0.0b0 (35a6907d79@2024-03-24T10:31:14)
+[number_detect-4] I RKNN: [23:15:51.402] RKNN Driver Information, version: 0.9.6
+[number_detect-4] I RKNN: [23:15:51.403] RKNN Model Information, version: 6, toolkit version: 2.0.0b0+9bab5682(compiler version: 2.0.0b0 (35a6907d79@2024-03-24T02:34:11)), target: RKNPU v2, target platform: rk3588, framework name: PyTorch, framework layout: NCHW, model inference type: static_shape
+[rcl_fsm_main-6] Exception in thread Thread-1 (receive):
+[rcl_fsm_main-6] Traceback (most recent call last):
+[rcl_fsm_main-6]   File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+[rcl_fsm_main-6]     self.run()
+[rcl_fsm_main-6]   File "/usr/lib/python3.10/threading.py", line 953, in run
+[rcl_fsm_main-6]     self._target(*self._args, **self._kwargs)
+[rcl_fsm_main-6]   File "/home/cat/ws_comp29/install/comp29communicator/lib/python3.10/site-packages/comp29communicator/UDPProcess.py", line 67, in receive
+[rcl_fsm_main-6]     data_t, addr_t = self.sock.recvfrom(1024)
+[rcl_fsm_main-6] OSError: [Errno 9] Bad file descriptor
+[uav2ros2-3] Traceback (most recent call last):
+[uav2ros2-3]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/uav2ros2.py", line 283, in main
+[uav2ros2-3]     uav2ros_node.run()
+[uav2ros2-3]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/uav2ros2.py", line 107, in run
+[uav2ros2-3]     rclpy.spin_once(self, timeout_sec=0.3)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 202, in spin_once
+[uav2ros2-3]     executor.spin_once(timeout_sec=timeout_sec)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 739, in spin_once
+[uav2ros2-3]     self._spin_once_impl(timeout_sec)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 728, in _spin_once_impl
+[uav2ros2-3]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 711, in wait_for_ready_callbacks
+[uav2ros2-3]     return next(self._cb_iter)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 608, in _wait_for_ready_callbacks
+[uav2ros2-3]     wait_set.wait(timeout_nsec)
+[uav2ros2-3] KeyboardInterrupt
+[uav2ros2-3] 
+[uav2ros2-3] During handling of the above exception, another exception occurred:
+[uav2ros2-3] 
+[uav2ros2-3] Traceback (most recent call last):
+[uav2ros2-3]   File "/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/uav2ros2", line 33, in <module>
+[uav2ros2-3]     sys.exit(load_entry_point('comp29hardware==0.0.0', 'console_scripts', 'uav2ros2')())
+[uav2ros2-3]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/uav2ros2.py", line 286, in main
+[uav2ros2-3]     rclpy.shutdown()
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 126, in shutdown
+[uav2ros2-3]     _shutdown(context=context)
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+[uav2ros2-3]     return context.shutdown()
+[uav2ros2-3]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+[uav2ros2-3]     self.__context.shutdown()
+[uav2ros2-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
+[uwb2ros2-1] Traceback (most recent call last):
+[uwb2ros2-1]   File "/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/uwb2ros2", line 33, in <module>
+[uwb2ros2-1]     sys.exit(load_entry_point('comp29hardware==0.0.0', 'console_scripts', 'uwb2ros2')())
+[uwb2ros2-1]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/uwb2ros2.py", line 99, in main
+[uwb2ros2-1]     rclpy.shutdown()
+[uwb2ros2-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 126, in shutdown
+[uwb2ros2-1]     _shutdown(context=context)
+[uwb2ros2-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+[uwb2ros2-1]     return context.shutdown()
+[uwb2ros2-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+[uwb2ros2-1]     self.__context.shutdown()
+[uwb2ros2-1] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
+[gport2ros2-2] Traceback (most recent call last):
+[gport2ros2-2]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/gport2ros2.py", line 108, in main
+[gport2ros2-2]     gimbal2ros_node.run()
+[gport2ros2-2]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/gport2ros2.py", line 99, in run
+[gport2ros2-2]     rclpy.spin(self)
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 222, in spin
+[gport2ros2-2]     executor.spin_once()
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 739, in spin_once
+[gport2ros2-2]     self._spin_once_impl(timeout_sec)
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 728, in _spin_once_impl
+[gport2ros2-2]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 711, in wait_for_ready_callbacks
+[gport2ros2-2]     return next(self._cb_iter)
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 608, in _wait_for_ready_callbacks
+[gport2ros2-2]     wait_set.wait(timeout_nsec)
+[gport2ros2-2] KeyboardInterrupt
+[gport2ros2-2] 
+[gport2ros2-2] During handling of the above exception, another exception occurred:
+[gport2ros2-2] 
+[gport2ros2-2] Traceback (most recent call last):
+[gport2ros2-2]   File "/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/gport2ros2", line 33, in <module>
+[gport2ros2-2]     sys.exit(load_entry_point('comp29hardware==0.0.0', 'console_scripts', 'gport2ros2')())
+[gport2ros2-2]   File "/home/cat/ws_comp29/install/comp29hardware/lib/python3.10/site-packages/comp29hardware/gport2ros2.py", line 110, in main
+[gport2ros2-2]     rclpy.shutdown()
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 126, in shutdown
+[gport2ros2-2]     _shutdown(context=context)
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+[gport2ros2-2]     return context.shutdown()
+[gport2ros2-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+[gport2ros2-2]     self.__context.shutdown()
+[gport2ros2-2] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
+[ERROR] [comp29main-7]: process has died [pid 14883, exit code -2, cmd '/home/cat/ws_comp29/install/comp29planner/lib/comp29planner/comp29main --ros-args -r __node:=comp29_main_node --params-file /tmp/launch_params_heh26vcl'].
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[rcl_fsm_main-6] [fsm] ip list:
+[rcl_fsm_main-6] ['192.168.151.201', '192.168.151.202', '192.168.151.203', '192.168.151.204']
+[rcl_fsm_main-6] [fsm] initiatilized, uav id: 2, swarm num: 4
+[rcl_fsm_main-6] [udp process] receive thread started ...
+[ERROR] [number_detect-4]: process has died [pid 14877, exit code -2, cmd '/home/cat/ws_comp29/install/comp29detector/lib/comp29detector/number_detect --ros-args -r __node:=number_detector'].
+[rcl_fsm_main-6] Traceback (most recent call last):
+[rcl_fsm_main-6]   File "/home/cat/ws_comp29/install/comp29communicator/lib/comp29communicator/rcl_fsm_main", line 33, in <module>
+[rcl_fsm_main-6]     sys.exit(load_entry_point('comp29communicator==0.0.0', 'console_scripts', 'rcl_fsm_main')())
+[rcl_fsm_main-6]   File "/home/cat/ws_comp29/install/comp29communicator/lib/python3.10/site-packages/comp29communicator/rcl_fsm.py", line 667, in main
+[rcl_fsm_main-6]     fsm_cb_pid.join()
+[rcl_fsm_main-6]   File "/usr/lib/python3.10/threading.py", line 1096, in join
+[rcl_fsm_main-6]     self._wait_for_tstate_lock()
+[rcl_fsm_main-6]   File "/usr/lib/python3.10/threading.py", line 1116, in _wait_for_tstate_lock
+[rcl_fsm_main-6]     if lock.acquire(block, timeout):
+[rcl_fsm_main-6] KeyboardInterrupt
+[gport2ros2-2] Exception ignored in: <module 'threading' from '/usr/lib/python3.10/threading.py'>
+[gport2ros2-2] Traceback (most recent call last):
+[gport2ros2-2]   File "/usr/lib/python3.10/threading.py", line 1567, in _shutdown
+[gport2ros2-2]     lock.acquire()
+[gport2ros2-2] KeyboardInterrupt: 
+[uwb2ros2-1] Exception ignored in: <module 'threading' from '/usr/lib/python3.10/threading.py'>
+[uwb2ros2-1] Traceback (most recent call last):
+[uwb2ros2-1]   File "/usr/lib/python3.10/threading.py", line 1567, in _shutdown
+[uwb2ros2-1]     lock.acquire()
+[uwb2ros2-1] KeyboardInterrupt: 
+[uav2ros2-3] Exception ignored in: <module 'threading' from '/usr/lib/python3.10/threading.py'>
+[uav2ros2-3] Traceback (most recent call last):
+[uav2ros2-3]   File "/usr/lib/python3.10/threading.py", line 1567, in _shutdown
+[uav2ros2-3]     lock.acquire()
+[uav2ros2-3] KeyboardInterrupt: 
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[rcl_fsm_main-6] Exception ignored in: <module 'threading' from '/usr/lib/python3.10/threading.py'>
+[rcl_fsm_main-6] Traceback (most recent call last):
+[rcl_fsm_main-6]   File "/usr/lib/python3.10/threading.py", line 1567, in _shutdown
+[rcl_fsm_main-6]     lock.acquire()
+[rcl_fsm_main-6] KeyboardInterrupt: 
+[ERROR] [uwb2ros2-1]: process has died [pid 14871, exit code -2, cmd '/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/uwb2ros2 --ros-args -r __node:=hardware_uwb_node'].
+[ERROR] [gport2ros2-2]: process has died [pid 14873, exit code -2, cmd '/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/gport2ros2 --ros-args -r __node:=hardware_gport_node'].
+[ERROR] [uav2ros2-3]: process has died [pid 14875, exit code -2, cmd '/home/cat/ws_comp29/install/comp29hardware/lib/comp29hardware/uav2ros2 --ros-args -r __node:=hardware_uav_node'].
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT) again, ignoring...
+[ERROR] [rcl_fsm_main-6]: process has died [pid 14881, exit code -2, cmd '/home/cat/ws_comp29/install/comp29communicator/lib/comp29communicator/rcl_fsm_main --ros-args -r __node:=Communicator_FSM'].
+cat@lubancat2:~$ 

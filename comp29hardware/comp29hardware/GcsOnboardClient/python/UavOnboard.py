@@ -147,7 +147,7 @@ class UAVOnBoard:
         self.should_shutdown = False
         self.ros_on = ros_on
         if self.open_flag:
-            print("连接初始化完成")
+            print("连接初始化完成", flush=True)
             self.gcs_master_udpin.port.settimeout(1)
             self.fcu_master.port.timeout = 1
             self.data_trans_begin()
@@ -215,8 +215,8 @@ class UAVOnBoard:
         try:
             self.fcu_master = mavutil.mavlink_connection(self.fcu_port, baud=self.fcu_baud)
             self.fcu_master.mav.version = 'v2.0'
-            print("飞控连接成功@" + self.fcu_port + " " + str(self.fcu_baud))
-            print("FCU connected@" + self.fcu_port + " " + str(self.fcu_baud))
+            print("飞控连接成功@" + self.fcu_port + " " + str(self.fcu_baud), flush=True)
+            print("FCU connected@" + self.fcu_port + " " + str(self.fcu_baud), flush=True)
         except Exception as e:
             print(e)
             self.open_flag = False
@@ -238,8 +238,8 @@ class UAVOnBoard:
             try:
                 self.gcs_master_udpout = mavutil.mavlink_connection(f"udpout:{self.gcs_ip}:{self.msg_in_port_gcs}",source_system=255, source_component=1)
                 self.gcs_master_udpout.mav.version = 'v2.0'
-                print("打开udpout网口成功@" + f"udpout:{self.gcs_ip}:{self.msg_in_port_gcs}")
-                print("GCS connected@" + f"udpout:{self.gcs_ip}:{self.msg_in_port_gcs}")
+                print("打开udpout网口成功@" + f"udpout:{self.gcs_ip}:{self.msg_in_port_gcs}", flush=True)
+                print("GCS connected@" + f"udpout:{self.gcs_ip}:{self.msg_in_port_gcs}", flush=True)
             except Exception as e:
                 print(e)
                 self.open_flag = False
@@ -248,7 +248,7 @@ class UAVOnBoard:
             try:
                 self.gcs_master_udpin = mavutil.mavlink_connection(f"udpin:{self.local_ip}:{self.msg_in_port_local}",source_system=255, source_component=1)
                 self.gcs_master_udpin.mav.version = 'v2.0'
-                print("打开udpin网口成功@" + f"udpin:{self.local_ip}:{self.msg_in_port_local}")
+                print("打开udpin网口成功@" + f"udpin:{self.local_ip}:{self.msg_in_port_local}", flush=True)
             except Exception as e:
                 print(e)
                 self.open_flag = False
@@ -697,7 +697,7 @@ class UAVOnBoard:
             
     def data_fcu2gcs_t(self):
         last_print_time = time.time()
-        print("begin to trans from fcu")
+        print("begin to trans from fcu", flush=True)
         while not self.should_shutdown:
             try:
                 # 从飞控接收消息
@@ -793,9 +793,9 @@ class UAVOnBoard:
                 elif msg_type == 'GPS_RAW_INT':
                     m = msg.to_dict()
                     self.gps = [float(msg.lat) / 1.e7, float(msg.lon) / 1.e7]
-                if msg_type not in ['BAD_DATA']:  # 忽略无效数据 TODO 需要检测
+                if msg_type in ['BATTERY_STATUS', 'GPS_RAW_INT']:  # 忽略无效数据 TODO 需要检测
                     # 将消息原样转发到地面站
-                    continue
+                    # continue
                     self.gcs_master_udpout.mav.send(msg)
             except KeyboardInterrupt:
                 print("程序被用户中断")

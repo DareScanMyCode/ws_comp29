@@ -11,7 +11,7 @@ from threading import Thread
 class UDPCommunicator:
     def __init__(self, port=25001):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(('', port))              # IP一般不写
+        self.sock.bind(('0.0.0.0', port))              # IP一般不写
         #self.sock.setblocking(False)
         #self.selector = selectors.DefaultSelector()
         #self.selector.register(self.sock, selectors.EVENT_READ)
@@ -36,7 +36,14 @@ class UDPCommunicator:
     '''
 
     def send(self, message, target_ip, target_port):
-        return self.sock.sendto(message, (target_ip, target_port))
+        try:
+            self.sock.sendto(message, (target_ip, target_port))
+            return True
+        except:
+            # print(f"[udp process] send error {target_ip}@{target_port}")
+            return False
+            
+        # return self.sock.sendto(message, (target_ip, target_port))
 
     def start_receive_thread(self):
         self.recv_thread_t = threading.Thread(target=self.receive)

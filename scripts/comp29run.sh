@@ -1,4 +1,5 @@
 #!/bin/bash
+clear
 # 定义颜色
 RED='\033[31m'
 GREEN='\033[32m'
@@ -55,7 +56,7 @@ fi
 
 # 设置ros2的logger格式
 echo ">>> 设置ROS 2 日志格式"
-export RCUTILS_LOGGING_BUFFERED_STREAM=1
+export RCUTILS_LOGGING_BUFFERED_STREAM=0
 export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}]: {message}"
 
 # 重新加载 .bashrc 以应用更改
@@ -63,7 +64,11 @@ export RCUTILS_CONSOLE_OUTPUT_FORMAT="[{severity}] [{time}]: {message}"
 
 echo ">>> ROS 2 日志格式已设置为仅包括节点名称、时间和消息类型。"
 
+echo ">>> 设置DISPLAY=:0"
 export DISPLAY=:0
+echo ">>> 设置ROS_LOCALHOST_ONLY=1"
+export ROS_LOCALHOST_ONLY=1
+
 echo ">>> 构建与source"
 cd ~/ws_comp29
 colcon build

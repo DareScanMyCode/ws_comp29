@@ -44,7 +44,7 @@ class Gimbal2ROSNode(Node):
         y = msg.pose.position.z
         
         self.gimbal.set_angle_degree(r, p, y)
-        self.get_logger().info(f'GIMBAL SET @ ROLL {r}, PITCH {p}, YAW {y}')
+        # self.get_logger().info(f'GIMBAL SET @ ROLL {r}, PITCH {p}, YAW {y}')
         
     def listing_t(self):
         rate = self.create_rate(int(self.gimbal_pub_fps))

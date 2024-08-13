@@ -38,7 +38,7 @@ class Uav2ROSNode(Node):
         # TODO 是否修改成同步发送，收到信息就发送？需要修改UAVOnboard程序
         self.fcu_pub_fps        = self.declare_parameter('fcu_pub_fps', 20.0).get_parameter_value().double_value
         
-        self.mis_state_pub      = self.create_publisher(Int64,             'mission_state', 1)
+        self.mis_state_pub      = self.create_publisher(Int64,             'super_mission_state', 1)
         self.imu_pub            = self.create_publisher(Imu,               'imu', 1)
         self.servo_pub          = self.create_publisher(Float32MultiArray, 'servo_data', 1)
         self.attitude_tgt_pub   = self.create_publisher(Float32MultiArray, 'attitude_setpt', 1)

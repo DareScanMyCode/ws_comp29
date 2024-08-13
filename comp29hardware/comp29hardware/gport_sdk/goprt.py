@@ -29,7 +29,7 @@ class GportGimbal:
     # GPORT_MAX_ROLL              = 45
     # GPORT_MIN_ROLL              = -45
     def __init__(self, port, baudrate=115200) -> None:
-        self.print_tip()
+        # self.print_tip()
         self.imu_rpy = rpy()
         self.hall_rpy = rpy()
         self.ser = serial.Serial(port, baudrate)

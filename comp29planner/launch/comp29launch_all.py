@@ -33,12 +33,7 @@ def generate_launch_description():
         # parameters=[]
     )
     
-    comp29_planner_node=Node(
-        package='comp29planner',
-        executable='comp29main',
-        name='comp29_main_node',
-        output='screen',
-    )
+
 
     comp29_detector_node=Node(
         package='comp29detector',
@@ -53,6 +48,23 @@ def generate_launch_description():
         name='Communicator_FSM',
         output='screen',        
     )
+
+    comp29_localization_node=Node(
+        package='comp29localization',
+        executable='ekf2_main',
+        name='ekf2_main_w_uwb',
+        output='screen',
+    )      
+    
+    comp29_planner_node=Node(
+        package='comp29planner',
+        executable='comp29main',
+        name='comp29_main_node',
+        output='screen',
+        parameters=[
+            {'use_ekf_pos': False,}
+        ]
+    )
       
     return LaunchDescription([
         param1,
@@ -60,8 +72,9 @@ def generate_launch_description():
         hardware_uwb_node,
         hardware_gport_node,
         hardware_uav_node,
-        comp29_planner_node,
         comp29_detector_node,
-        comp29_communicate_node
+        comp29_localization_node,
+        comp29_communicate_node,
+        comp29_planner_node,
         # node2,
     ])

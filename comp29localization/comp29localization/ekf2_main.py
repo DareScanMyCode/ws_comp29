@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 #!/usr/bin/python3
-
+import os
 import rclpy
 import time
 from rclpy.node import Node
@@ -13,29 +13,38 @@ from comp29msg.msg import CommunicationInfo, UAVInfo
 import numpy as np
 import scipy
 from numpy import array, zeros
+from colorama import Fore, Back, Style
 
 from comp29localization.ekf_utils import dshot_2_T
 from comp29localization.ekf_utils import quaternion2euler, euler2quaternion, constraint_yaw, constraint_float
+from comp29localization.ekf_uwb_pose_alignment import optimize_pose_between_frames, optimize_pose_in_frames, local_pos_alginment
 
 '''
     UAV Parameters
 '''
 uav_id  = 3
+group_id = 4
 acc_max = 5  # m / s^2
 uav_m = 1.35
 g = 9.81
 dt = 0.001
 #
 swarm_num = 8
-t_uwb_sampling = 2.5            # UWB以3秒为更新周期, 其中2.5秒等待, 0.5秒的区间用于接收数据
+dist_array_num = 10
+t_uwb_sampling = 1.5            # UWB以2秒为更新周期, 其中1.5秒等待, 0.5秒的区间用于接收数据                    # TODO 实际运算速率会低于这个值
 t_uwb_recv_cutoff = 0.5         # 前者是为了保证有足够的运动距离, 不然测出来全是噪声
                                 # 后者不能太宽也不能太窄, 在这个区间内收到的所有位置信息都会被记录且更新, 用于位置修正
+#
+x_initial = 0.
+y_initial = 0.
 '''
     Debugging options
 '''
 is_debugging_data_recv = False
-is_debugging_ekf = True
+is_debugging_ekf = False
+is_debugging_uwb = False
 is_display_data  = False
+
 
 imu_data = Imu()
 imu_data_last = Imu()
@@ -781,47 +790,6 @@ def EKF_update_servo(Xk, Pk, servo, servo_last, dt, rpy=None, is_debugging=False
 
     return X, K, Pt
 
-def optimize_pose_in_frames(Xt_all, distance_matrix):
-    """
-    :param Xt_all:              【矩阵】n架无人机位置信息[ x y z ] 维度：n×3
-    :param distance_matrix:     【矩阵】n架无人机相对位置信息       维度：n×n
-    :return Xt_all:             【矩阵】更新后无人机位置信息        维度：n×3
-    """
-    count = len(Xt_all)
-
-    def opt_goal1(x):
-        return np.sum(x**2)
-
-    def opt_goal2(x):
-        goal2 = 0
-        for i in range(0, count):
-            for j in range(i + 1, count):
-                if distance_matrix[i][j] != 0 or distance_matrix[j][i] != 0:
-                    # 取非零距离，或取平均值
-                    if distance_matrix[i][j] == 0 and distance_matrix[j][i] != 0:
-                        dist = distance_matrix[j][i]
-                    elif distance_matrix[j][i] == 0 and distance_matrix[i][j] != 0:
-                        dist = distance_matrix[i][j]
-                    elif distance_matrix[i][j] != 0 and distance_matrix[j][i] != 0:
-                        dist = (distance_matrix[i][j] + distance_matrix[j][i]) / 2
-                    goal2 += (dist - sqrt((Xt_all[i][0] - Xt_all[j][0] + x[2 * i] - x[2 * j]) ** 2 + (
-                                        Xt_all[i][1] - Xt_all[j][1] + x[2 * i + 1] - x[2 * j + 1]) ** 2)) ** 2
-        return goal2
-
-    k1 = 5
-    k2 = 1
-
-    def opt_goal(x):
-        return k1 * opt_goal1(x) + k2 * opt_goal2(x)
-
-    initial = ravel(reshape(Xt_all[:,:2],[2*count,1]))
-    result = minimize(opt_goal, initial)
-    # 更新 Xt_all 使用优化结果
-    optimized_positions = np.array([result.x[0::2], result.x[1::2]]).T
-    Xt_all[:, :2] += optimized_positions
-    print(f"[optimize] correction amount: {optimized_positions}")
-    return Xt_all
-
 pos_x_history = []
 pos_y_history = []
 pos_z_history = []  # 如果是真机这个变量要定长, 超过长度则压一个弹一个
@@ -933,6 +901,57 @@ def acc_filter(ax, ay, az, dt=0.1):
 
     return ax, ay, az
 
+def load_system_params(node):
+    #
+    global uav_id, group_id, swarm_num, dist_array_num
+    global x_initial, y_initial
+    # 参数
+    uav_id = int(os.environ.get('UAV_ID', '-1'))
+    if uav_id == -1:
+        node.get_logger().warn("[fsm] UAV_ID未被设置！！！！")
+    username = os.environ.get("USER", 'cat')
+    filepath = f'/home/{username}/ws_comp29/src/configs/missionCFG.json'
+    # 读取任务配置文件
+    if not os.path.exists(filepath):
+        node.get_logger().error(f"[fsm] Config file {filepath} does not exist.")
+        return None
+    # 打开并读取 JSON 文件
+    import json
+    try:
+        with open(filepath, 'r') as file:
+            mis_cfg = json.load(file)
+        node.get_logger().info(f"Config file {filepath} loaded successfully.")
+    except Exception as e:
+        node.get_logger().error(f"Failed to read config file: {e}")
+    
+    if mis_cfg is not None:
+        map_w              = mis_cfg['MAP_W']
+        map_l              = mis_cfg['MAP_L']
+        map_angle          = mis_cfg['MAP_ANGLE']
+        dx_per_line        = mis_cfg['DX_PER_LINE']
+        
+        leader_id          = mis_cfg['LEADER_ID']
+        angle_leader_id    = mis_cfg['ANGLE_LEADER_ID']
+        swarm_num            = mis_cfg['NUM_UAV']
+        
+        group_1            = mis_cfg['GROUP_1']
+        group_2            = mis_cfg['GROUP_2']
+        group_3            = mis_cfg['GROUP_3']
+
+        x_initial          = mis_cfg["INITIAL_POS"]['UAV' + str(uav_id)][0]
+        y_initial          = mis_cfg["INITIAL_POS"]['UAV' + str(uav_id)][1]        
+
+        group_id = 1 if uav_id in group_1 else 2 if uav_id in group_2 else 3 if uav_id in group_3 else -1
+        
+        if group_id == -1:
+            node.get_logger().warn("[fsm] UAV_ID未被分组！！！！")
+        
+        #dist_array_num = swarm_num + 1
+            
+    else:
+        node.get_logger().warn("[fsm] 未能读取到任务配置文件！！！！")
+        dist_array_num = 10
+
 def main(args=None):
     #
     global imu_data,       imu_data_last,       t_imu,       t_imu_last,       is_imu_data_ready
@@ -944,11 +963,14 @@ def main(args=None):
     global comm_info,         is_comm_info_updated
     global this_uav_uwb_data, is_this_uav_uwb_updated
     #
-    global swarm_num, t_uwb_sampling, t_uwb_recv_cutoff
+    global uav_id, group_id, swarm_num, dist_array_num, t_uwb_sampling, t_uwb_recv_cutoff
+    global x_initial, y_initial
     global dt
 
     rclpy.init(args=args)
-    node = Node('data_collector')
+    node = Node('ekf2_main_w_uwb')
+
+    load_system_params(node)
 
     #
     imu_sub             = node.create_subscription(Imu, 'imu', imu_cb, 10)
@@ -959,7 +981,7 @@ def main(args=None):
     gps_pos_sub         = node.create_subscription(PoseStamped, 'gps_position', gps_cb, 1)
     vicon_pos_sub       = node.create_subscription(PoseStamped, '/vicon_pose', vicon_cb, 1)
     #
-    this_uav_uwb_topic_name       = 'uwb_filtered_topic'
+    this_uav_uwb_topic_name       = '/uwb_filtered'
     this_uav_uwb_sub     = node.create_subscription(Float32MultiArray, this_uav_uwb_topic_name, this_uav_uwb_cb, 1)
     comm_info_topic_name = "/uav" + str(uav_id) + "/comm_info"
     uav_swarm_uwb_sub    = node.create_subscription(CommunicationInfo, comm_info_topic_name, comm_info_cb, 1)
@@ -970,6 +992,15 @@ def main(args=None):
     ekf2_vel_pub        = node.create_publisher(TwistStamped, ekf2_vel_topic_name, 1)
     ekf2_pose = PoseStamped()
     ekf2_vel  = TwistStamped()
+    #
+    ekf2_uwb_local_pos_topic_name  = '/uav' + str(uav_id) + "/ekf2/local_pose"
+    ekf2_uwb_local_pos_pub         = node.create_publisher(PoseStamped,  ekf2_uwb_local_pos_topic_name, 1)
+    ekf2_uwb_center_pos_topic_name = '/uav' + str(uav_id) + "/ekf2/center_pos"
+    ekf2_uwb_center_pos_pub        = node.create_publisher(PoseStamped,  ekf2_uwb_center_pos_topic_name, 1)
+    ekf2_uwb_local_pos  = PoseStamped()
+    ekf2_uwb_center_pos = PoseStamped()
+
+    print((Fore.LIGHTBLUE_EX + "[ekf2 uwb] Initialized success, UAV id: %d, swarm num: %d ..." % (uav_id, swarm_num) + Style.RESET_ALL))
 
     #
     t0 = time.time()
@@ -985,10 +1016,10 @@ def main(args=None):
     P = np.identity(10) * 1.
 
     while not is_imu_data_ready:
-        print("[ekf2] waiting for imu data ...")
-        time.sleep(0.5)
+        node.get_logger().info("[ekf2] waiting for imu data ...")
         rclpy.spin_once(node)
-
+        time.sleep(1.0)
+    print(Style.BRIGHT + Fore.GREEN + "[ekf2] Data Received, Starting EKF ..." + Style.RESET_ALL)
     #
     # inject initial value if possible
     if is_imu_data_ready:
@@ -1012,7 +1043,8 @@ def main(args=None):
         X[5] = vel_data.twist.linear.z
         #
         is_vel_data_ready = False
-    if is_local_pos_data_ready:
+    #if is_local_pos_data_ready:
+    if False:
         if local_pos_data.pose.position.x != 0. and local_pos_data.pose.position.y != 0.:
             X[0] = local_pos_data.pose.position.x
             X[1] = local_pos_data.pose.position.y
@@ -1025,6 +1057,12 @@ def main(args=None):
         X[2] = vicon_data.pose.position.z
         #
         is_vicon_data_ready = False
+    else:
+        X[0] = x_initial
+        X[1] = y_initial
+        X[2] = 0.
+
+    print(Style.BRIGHT + Fore.GREEN + "[ekf2] Initial Params: " + str(X) + Style.RESET_ALL)
 
     '''
     histroial parameters
@@ -1055,12 +1093,22 @@ def main(args=None):
     t_attitude_last = time.time()
     #
     is_pos_optimized = False
-    is_dist_updated = [ False for i in range(0, swarm_num) ]
-    dist_matrix = np.zeros([10, 10])
-    companion_pos_list = [[0, 0, 0] for i in range(0, swarm_num)]
+    is_dist_updated = [ False for i in range(0, dist_array_num) ]
+    dist_matrix   = np.zeros([dist_array_num, dist_array_num])
+    dist_mat_last = np.zeros([dist_array_num, dist_array_num])                            # [swarm_num + 1, swarm_num + 1]    
+    #
+    X_opt_list = []
+    X_opt_list_2 = []
+    optimized_pose_last = []                                                    # (np.vstack([zeros(3), zeros(3), zeros(3), zeros(3), zeros(3)]), [-1, -1, -1]), 数据结构, [(optimized_pose, [用于计算的三个id])]
+    companion_pos_list = [[0, 0, 0] for i in range(0, dist_array_num)]          # 这个数据格式就是uav 1 - 9用于计算的位置, n * 3的矩阵
     update_id_pair = []
+    #
     t_uwb = time.time()
     t_uwb_stage = t_uwb % (t_uwb_sampling + t_uwb_recv_cutoff)
+    #
+    x_local = np.zeros([3, 3])
+    center_pos = np.zeros(3)
+    is_local_pos_updated = False
     #
     while rclpy.ok():
 
@@ -1213,7 +1261,7 @@ def main(args=None):
             #X, K_slam, P = EKF_update_SLAM...
             pass
 
-        if is_servo_data_ready and servo_data.__len__() > 0 and servo_data_last.__len__() > 0:
+        if is_servo_data_ready and is_imu_data_ready and servo_data.__len__() > 0 and servo_data_last.__len__() > 0:
         #if False:
             #
             dt_servo = t_servo - t_servo_last    
@@ -1222,7 +1270,7 @@ def main(args=None):
                 is_servo_data_ready = False
                 continue
             #
-            rpy = quaternion2euler(quat, is_degree=False)
+            rpy = quaternion2euler(quat, is_degree=False)                       # TODO 注意这里要用到imu数据
             rol = rpy[0]
             pit = rpy[1]
             yaw = rpy[2]                            # TODO check orientation
@@ -1247,6 +1295,10 @@ def main(args=None):
         x_lpf,  y_lpf,  z_lpf  = pos_filter(X[0], X[1], X[2], dt=dt)
         vx_lpf, vy_lpf, vz_lpf = vel_filter(X[3], X[4], X[5], dt=dt)
 
+        if is_debugging_ekf:
+            print(Style.BRIGHT + Fore.GREEN + "[ekf2] optained pos: %f %f %f" % (x_lpf,  y_lpf,  z_lpf,  ) + Style.RESET_ALL)
+            print(Style.BRIGHT + Fore.CYAN  + "[ekf2] optained vel: %f %f %f" % (vx_lpf, vy_lpf, vz_lpf, ) + Style.RESET_ALL)
+
         #
         # update UWB
         t_uwb = time.time() - t0
@@ -1255,18 +1307,30 @@ def main(args=None):
         if t_uwb_stage >= t_uwb_sampling and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff:
             #
             # 收集数据
+            #if is_debugging_uwb:
+            if False:
+                print(Fore.LIGHTBLUE_EX + "[ekf2 uwb] collecting data ..." + Style.RESET_ALL)
+
 
             # CRITICAL
             # reset
             is_pos_optimized = False
+            is_last_pos_matched = False
             
             if is_this_uav_uwb_updated and is_comm_info_updated:
                 #
-                for i in range(0, swarm_num):
+                for i in range(0, dist_array_num):
                     companion_id_t = comm_info.uav[i].id
-                    dist_list_t = comm_info.uav[i].dist
+                    dist_list_t = comm_info.uav[i].dist.data
                     pos_t = [comm_info.uav[i].pos.pose.position.x, comm_info.uav[i].pos.pose.position.y, comm_info.uav[i].pos.pose.position.z]
-                    for j in range(0, swarm_num):
+
+                    #if is_debugging_uwb:
+                    if False:
+                        print(Fore.LIGHTBLUE_EX + "[ekf2 uwb] recv uav pos, id: %d" % (companion_id_t, ))
+                        print(pos_t)
+                        print(Style.RESET_ALL)
+
+                    for j in range(0, dist_array_num):
                         if dist_list_t[j] != 0:
                             #
                             # 如果有数则更新取均值
@@ -1301,67 +1365,289 @@ def main(args=None):
                             if companion_pos_list[companion_id_t][2] == 0:
                                 companion_pos_list[companion_id_t][2] = pos_t[2]
                             else:
-                                companion_pos_list[companion_id_t][2] = (companion_pos_list[companion_id_t][2] + pos_t[2]) / 2                                
+                                companion_pos_list[companion_id_t][2] = (companion_pos_list[companion_id_t][2] + pos_t[2]) / 2
 
                 #
                 # finally
                 # generate state update pair
-                for i in range(0, swarm_num):
-                    for j in range(i + 1, swarm_num):
-                        if is_dist_updated[i] and is_dist_updated[j]:
-                            update_id_pair.append((i, j, ))
+                for i in range(0, dist_array_num):
+                    for j in range(i + 1, dist_array_num):
+                        if is_dist_updated[i] and is_dist_updated[j] and i != uav_id and j != uav_id:
+                            group_id_i = comm_info.uav[i].group_id
+                            group_id_j = comm_info.uav[j].group_id
+                            #
+                            # TODO
+                            # Added, 为了方便计算, 可以只用一个group的数据
+                            #if group_id == group_id_i and group_id == group_id_j:
+                            if True:
+                                update_id_pair.append((i, j, ))
+                            else:
+                                print(Style.BRIGHT + Fore.LIGHTYELLOW_EX + "[ekf2 uwb] WARNING find available data but not in THE SAME GROUP: %d %d %d" % (group_id, group_id_i, group_id_j, ) + Style.RESET_ALL)
+                update_id_pair = list(set(update_id_pair))
 
             if is_this_uav_uwb_updated:
                 is_this_uav_uwb_updated = False
             if is_comm_info_updated:
                 is_comm_info_updated = False
 
+            #if is_debugging_uwb:
+            if False:
+                print(Fore.LIGHTCYAN_EX + "[ekf2 uwb] dist mat")
+                print(dist_matrix)
+                print(Style.RESET_ALL)
+
+        try:
+        #if True:                                                # TODO Critical
+            #
+            # 这里因为dt很小所以 * 10.1
+            # 否则乘以5.1甚至2.1就够了
+            if not is_pos_optimized and t_uwb_stage >= t_uwb_sampling + t_uwb_recv_cutoff - dt * 10.1 and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff - dt * 1.1:
+                if is_debugging_uwb:
+                    print(Style.BRIGHT + Fore.LIGHTMAGENTA_EX + "[ekf2 uwb] calculating data ..., t_all, t_stage %f %f" % (t_uwb, t_uwb_stage, ) + Style.RESET_ALL)
+                    #
+                    print(Fore.LIGHTMAGENTA_EX + "[ekf2 uwb] dist mat")
+                    print(dist_matrix)
+                    print(Style.RESET_ALL)
+                    #
+                    print(Fore.MAGENTA + "[ekf2 uwb] companion pos")
+                    print(companion_pos_list)
+                    print(Style.RESET_ALL)
+                    #
+                    #
+                    print(Fore.MAGENTA + "[ekf2 uwb] update_id_pair")
+                    print(update_id_pair)
+                    print(Style.RESET_ALL)               
+
+                #
+                # 总体位置优化
+                for k in range(0, update_id_pair.__len__()):
+                    i = update_id_pair[k][0]
+                    j = update_id_pair[k][1]
+                    #
+                    pos_uav_i = companion_pos_list[i]
+                    pos_uav_j = companion_pos_list[j]
+                    #
+                    #X_opt_t = np.vstack([zeros(3), zeros(3), [x_lpf, y_lpf, z_lpf], pos_uav_i, pos_uav_j])
+                    X_opt_t = np.zeros([dist_array_num, 3])
+                    X_opt_t[i][0]      = pos_uav_i[0]; X_opt_t[i][1]      = pos_uav_i[1]; X_opt_t[i][2]      = pos_uav_i[2]
+                    X_opt_t[j][0]      = pos_uav_j[0]; X_opt_t[j][1]      = pos_uav_j[1]; X_opt_t[j][2]      = pos_uav_j[2]
+                    X_opt_t[uav_id][0] = x_lpf;        X_opt_t[uav_id][1] = y_lpf;        X_opt_t[uav_id][2] = z_lpf                #
+                    #
+                    if is_debugging_uwb:
+                    #if False:
+                        # TODO
+                        # TO check out value
+                        print(Fore.LIGHTYELLOW_EX + "[ekf2 uwb] opti_IN_frames X")
+                        print(X_opt_t)
+                        print("[ekf2 uwb] opti_BETWEEN_frames dist_mat")
+                        print(dist_matrix)
+                        print("[ekf2 uwb] opti_BETWEEN_frames uavs: %d %d %d", (uav_id, i, j,))
+                        print(Style.RESET_ALL)
+                    #
+                    X_opt_t = optimize_pose_in_frames(X_opt_t, dist_matrix, [uav_id, i, j])
+                    X_opt_list.append(X_opt_t)
+
+                    #
+                    #if is_debugging_uwb:
+                    if False:
+                        print("[ekf2 uwb] optimized_pose_last")
+                        print(optimized_pose_last)
+
+                    #
+                    is_last_pos_matched = False
+                    matched_opti_pose_index = -1
+                    if optimized_pose_last.__len__() and update_id_pair.__len__():                               # 第一帧不计算
+                        for p in range(0, optimized_pose_last.__len__()):
+                            id_list_last = optimized_pose_last[p][1]
+                            is_all_id_matched = True
+                            for q in range(0, 3):
+                                current_id_t = id_list_last[q]
+                                if not (current_id_t == uav_id or current_id_t in update_id_pair[k]):           # 所有ID都必须对上
+                                    is_all_id_matched = False                                                   # 这里顺序应该没关系
+                                    break
+                            if is_all_id_matched:
+                                matched_opti_pose_index = p
+                                is_last_pos_matched = True
+
+                                if is_debugging_uwb:
+                                    print(Fore.MAGENTA + "[ekf2 uwb] found_last pos for uavs: %d %d %d" % (uav_id, update_id_pair[k][0], update_id_pair[k][1]))
+                                    print(optimized_pose_last[matched_opti_pose_index][0])
+                                    print(Style.RESET_ALL)
+
+                                break
+                    #
+                    if is_last_pos_matched:
+                        #
+                        # X_opt_2数据结构
+                        # [[0, 0, 0],
+                        #  [0, 0, 0],
+                        #  [x_t, y_t, z_t], # 本机
+                        #  [x_i, y_i, z_i], # uav i
+                        #  [x_j, y_j, z_j], # uav j
+                        #  ]
+                        if is_debugging_uwb:
+                            print("[ekf2 uwb] opti_BETWEEN_frames X_last")
+                            print(optimized_pose_last[k][0])
+                            print("[ekf2 uwb] opti_BETWEEN_frames X")
+                            print(X_opt_t)
+                            # print("[ekf2 uwb] opti_BETWEEN_frames dist_mat_last")
+                            # print(dist_mat_last)
+                            # print("[ekf2 uwb] opti_BETWEEN_frames dist_mat")
+                            # print(dist_matrix)
+
+                        X_opt_t_2 = optimize_pose_between_frames(optimized_pose_last[matched_opti_pose_index][0], X_opt_t, dist_mat_last, dist_matrix, [uav_id, i, j])
+                        X_opt_list_2.append(X_opt_t_2)
+
+                # Finally
+                # 取平均值
+                # 一定要在最后取, 避免之前结果拉扯后续结果
+                if is_last_pos_matched and X_opt_list_2.__len__():
+                    #
+                    #if is_debugging_uwb:
+                    if False:
+                        print("[ekf2 uwb] X_opt_list_2")
+                        print(X_opt_list_2)
+                    #
+                    for p in range(0, X_opt_list_2.__len__()):
+                        x_lpf = x_lpf + (X_opt_list_2[p][uav_id][0] - x_lpf) / X_opt_list_2.__len__()           # TODO, to checkout
+                        y_lpf = y_lpf + (X_opt_list_2[p][uav_id][1] - y_lpf) / X_opt_list_2.__len__()           # x + dx的平均值
+                        z_lpf = z_lpf + (X_opt_list_2[p][uav_id][2] - z_lpf) / X_opt_list_2.__len__()           # 最后统一改到位置输出内, 这个数据不能并入EKF否则效果会很差
+
+                    print(Style.BRIGHT + Fore.GREEN + "[ekf2 uwb] BETWEEN Frames X: %f %f %f" % (x_lpf, y_lpf, z_lpf, ) + Style.RESET_ALL)
+
+                elif not is_last_pos_matched and X_opt_list.__len__():
+                    for p in range(0, X_opt_list.__len__()):
+                        x_lpf = x_lpf + (X_opt_list[p][uav_id][0] - x_lpf) / X_opt_list.__len__()
+                        y_lpf = y_lpf + (X_opt_list[p][uav_id][1] - y_lpf) / X_opt_list.__len__()
+                        z_lpf = z_lpf + (X_opt_list[p][uav_id][2] - z_lpf) / X_opt_list.__len__()
+
+                    print(Style.BRIGHT + Fore.GREEN + "[ekf2 uwb] IN Frames X: %f %f %f" % (x_lpf, y_lpf, z_lpf, ) + Style.RESET_ALL)
+                else:
+                    print(Style.BRIGHT + Fore.YELLOW + "[ekf2 uwb] NO Solution this time" + Style.RESET_ALL)
+                    pass
+
+                # TODO
+                # 计算局部位置
+                # 注意这个只在本组内计算
+                for k in range(0, update_id_pair.__len__()):
+                    #
+                    # step 1 check is in the same swarm group
+                    id_i_t = update_id_pair[k][0]
+                    id_j_t = update_id_pair[k][1]
+                    is_group_id_i_matched = False
+                    is_group_id_j_matched = False
+                    for p in range(0, comm_info.uav.__len__()):
+                        if id_i_t == comm_info.uav[p].id and group_id == comm_info.uav[p].group_id:
+                            is_group_id_i_matched = True
+                        if id_j_t == comm_info.uav[p].id and group_id == comm_info.uav[p].group_id:
+                            is_group_id_j_matched = True
+
+                    #
+                    # step 2
+                    # check whethet last pos matched
+                    is_last_pos_matched = False
+                    matched_opti_pose_index = -1
+                    if optimized_pose_last.__len__() and update_id_pair.__len__():                               # 第一帧不计算
+                        for p in range(0, optimized_pose_last.__len__()):
+                            id_list_last = optimized_pose_last[p][1]
+                            is_all_id_matched = True
+                            for q in range(0, 3):
+                                current_id_t = id_list_last[q]
+                                if not (current_id_t == uav_id or current_id_t in update_id_pair[k]):           # 所有ID都必须对上
+                                    is_all_id_matched = False                                                   # 这里顺序应该没关系
+                                    break
+                            if is_all_id_matched:
+                                matched_opti_pose_index = p
+                                is_last_pos_matched = True
+
+                                if is_debugging_uwb:
+                                    print(Fore.MAGENTA + "[ekf2 uwb] local found_last pos for uavs: %d %d %d" % (uav_id, update_id_pair[k][0], update_id_pair[k][1]))
+                                    print(optimized_pose_last[matched_opti_pose_index][0])
+                                    print(Style.RESET_ALL)
+
+                                break
+
+
+                    #
+                    # step 3 updated
+                    #if is_group_id_i_matched and is_group_id_j_matched and is_last_pos_matched:            # TODO 需要同组计算
+                    if is_last_pos_matched:
+                        center_pos, x_local = local_pos_alginment(np.array([X_opt_t_2[uav_id], X_opt_t_2[id_i_t], X_opt_t_2[id_j_t]]),
+                                                                    np.array([optimized_pose_last[matched_opti_pose_index][0][uav_id], optimized_pose_last[matched_opti_pose_index][0][id_i_t], optimized_pose_last[matched_opti_pose_index][0][id_j_t]]),
+                                                                    dist_mat_last,
+                                                                    dist_matrix,
+                                                                    [uav_id, id_i_t, id_j_t])
+                        print(Style.BRIGHT + Fore.GREEN + "[ekf2 uwb] LOCAL X: %f %f %f, center: %f %f %f" % (x_local[uav_id][0], x_local[uav_id][1], x_local[uav_id][2], center_pos[0], center_pos[1], center_pos[2], ) + Style.RESET_ALL)
+                        is_local_pos_updated = True
+
+                #
+                # iteration
+                optimized_pose_last.clear()         #For clearing, optimized_pose_last = np.vstack([zeros(3), zeros(3), zeros(3), zeros(3), zeros(3)])
+                for k in range(0, update_id_pair.__len__()):
+                    #
+                    #optimized_pose_last_t = np.vstack([zeros(3), zeros(3), [x_lpf, y_lpf, z_lpf], pos_uav_i, pos_uav_j])
+                    #
+                    i = update_id_pair[k][0]
+                    j = update_id_pair[k][1]
+                    if X_opt_list_2.__len__():
+                        pos_uav_i = X_opt_list_2[k][i]
+                        pos_uav_j = X_opt_list_2[k][j]
+                        pos_uav_t = X_opt_list_2[k][uav_id]
+                    elif X_opt_list.__len__():
+                        pos_uav_i = X_opt_list[k][i]
+                        pos_uav_j = X_opt_list[k][j]
+                        pos_uav_t = X_opt_list[k][uav_id]
+                    else:
+                        pos_uav_i = np.array([comm_info.uav[i].pos.pose.position.x, comm_info.uav[i].pos.pose.position.y, comm_info.uav[i].pos.pose.position.z])
+                        pos_uav_j = np.array([comm_info.uav[j].pos.pose.position.x, comm_info.uav[j].pos.pose.position.y, comm_info.uav[j].pos.pose.position.z])
+                        pos_uav_t = np.array([x_lpf, y_lpf, z_lpf])
+
+                    optimized_pose_last_t = np.zeros([dist_array_num, 3])
+                    optimized_pose_last_t[i][0]      = pos_uav_i[0]; optimized_pose_last_t[i][1]      = pos_uav_i[1]; optimized_pose_last_t[i][2]      = pos_uav_i[2]
+                    optimized_pose_last_t[j][0]      = pos_uav_j[0]; optimized_pose_last_t[j][1]      = pos_uav_j[1]; optimized_pose_last_t[j][2]      = pos_uav_j[2]
+                    optimized_pose_last_t[uav_id][0] = pos_uav_t[0]; optimized_pose_last_t[uav_id][1] = pos_uav_t[1]; optimized_pose_last_t[uav_id][2] = pos_uav_t[2]
+                    
+                    optimized_pose_last.append((optimized_pose_last_t, (uav_id, i , j)))
+                #
+                for p in range(0, dist_matrix.shape[0]):
+                    for q in range(0, dist_matrix.shape[1]):
+                        dist_mat_last[p][q] = dist_matrix[p][q]
+                
+                #if is_debugging_uwb:
+                if False:
+                    print("[ekf2 uwb] updated optimized pose last")
+                    print(optimized_pose_last)
+                    #
+                    print("[ekf2 uwb] updated dist_mat_last")
+                    print(dist_mat_last)
+
+                # TODO
+                # 完成计算后清零dist martix
+                is_pos_optimized = True
+                #
+                is_dist_updated.clear()
+                is_dist_updated = [ False for i in range(0, dist_array_num) ]
+                #
+                dist_matrix = np.zeros([10, 10])
+                #
+                companion_pos_list.clear()
+                companion_pos_list = [ [0, 0, 0] for i in range(0, dist_array_num) ]
+                #
+                update_id_pair.clear()
         #
-        # 这里因为dt很小所以 * 10.1
-        # 否则乘以5.1甚至2.1就够了
-        if not is_pos_optimized and t_uwb_stage >= t_uwb_sampling + t_uwb_recv_cutoff - dt * 10.1 and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff - dt * 1.1:        
-            #
-            # 总体位置优化
-            X_opt_list = []
-            for k in range(0, update_id_pair.__len__()):
-                i = update_id_pair[k][0]
-                j = update_id_pair[k][1]
-                #
-                pos_uav_i = companion_pos_list[i]
-                pos_uav_j = companion_pos_list[j]
-                #
-                X_opt_t = np.vstack([zeros(3), zeros(3), [x_lpf, y_lpf, z_lpf], pos_uav_i, pos_uav_j])
-                X_opt_t = optimize_pose_in_frames(X_opt_t, dist_matrix)
-                X_opt_list.append(X_opt_t)
-
-            # Finally
-            # 取平均值
-            # 一定要在最后取, 避免之前结果拉扯后续结果
-            if X_opt_list.__len__():
-                for i in range(0, X_opt_list.__len__()):
-                    x_lpf = float(x_lpf + X_opt_list[i][0]) / X_opt_list.__len__()
-                    y_lpf = float(y_lpf + X_opt_list[i][1]) / X_opt_list.__len__()
-                    z_lpf = float(z_lpf + X_opt_list[i][2]) / X_opt_list.__len__()          # 最后统一改到位置输出内
-            else:
-                pass
-
-
-            # TODO
-            # 计算局部位置
-
-            # TODO
-            # 完成计算后清零dist martix
-            is_pos_optimized = True
-            #
-            is_dist_updated.clear()
-            is_dist_updated = [ False for i in range(0, swarm_num) ]
-            #
-            dist_matrix = np.zeros([10, 10])
-            #
-            companion_pos_list.clear()
-            companion_pos_list = [ [0, 0, 0] for i in range(0, swarm_num) ]
-            #
-            update_id_pair.clear()
+        # TODO CRITICAL
+        except IndexError as e:
+            print(e)
+            print(Style.BRIGHT + Fore.LIGHTRED_EX + "[ekf2 uwb] WARNING EKF2 UWB Error" + Style.RESET_ALL)
+        except KeyError as e:
+            print(e)
+            print(Style.BRIGHT + Fore.LIGHTRED_EX + "[ekf2 uwb] WARNING EKF2 UWB Error" + Style.RESET_ALL)
+        except ValueError as e:
+            print(e)
+            print(Style.BRIGHT + Fore.LIGHTRED_EX + "[ekf2 uwb] WARNING EKF2 UWB Error" + Style.RESET_ALL)
+        except Exception as e:
+            print(e)
+            print(Style.BRIGHT + Fore.LIGHTRED_EX + "[ekf2 uwb] WARNING EKF2 UWB Error" + Style.RESET_ALL)
 
         #
         # TODO
@@ -1382,6 +1668,8 @@ def main(args=None):
             #
             ekf2_pos_pub.publish(ekf2_pose)
 
+            # print(Style.BRIGHT + Fore.GREEN + "[ekf2] published pos: %f %f %f" % (ekf2_pose.pose.position.x,  ekf2_pose.pose.position.y,  ekf2_pose.pose.position.z,  ) + Style.RESET_ALL)            
+
             #
             ekf2_vel.header.stamp = node.get_clock().now().to_msg()
             ekf2_vel.header.frame_id = 'base_link'
@@ -1394,8 +1682,27 @@ def main(args=None):
             #
             ekf2_vel_pub.publish(ekf2_vel)
 
+            # print(Style.BRIGHT + Fore.CYAN + "[ekf2] published vel: %f %f %f" % (ekf2_vel.twist.linear.x, ekf2_vel.twist.linear.y, ekf2_vel.twist.linear.z, ) + Style.RESET_ALL)
+
             # TODO
             # 发布局部位置
+            if is_local_pos_updated:
+                ekf2_uwb_local_pos.header.stamp = node.get_clock().now().to_msg()                
+                ekf2_uwb_local_pos.header.frame_id = 'swarm_center_ned'
+                ekf2_uwb_local_pos.pose.position.x = x_local[uav_id][0]
+                ekf2_uwb_local_pos.pose.position.y = x_local[uav_id][1]
+                ekf2_uwb_local_pos.pose.position.z = x_local[uav_id][2]
+                #
+                ekf2_uwb_local_pos_pub.publish(ekf2_uwb_local_pos)
+
+                ekf2_uwb_center_pos.header.stamp = node.get_clock().now().to_msg()                
+                ekf2_uwb_center_pos.header.frame_id = 'map'
+                ekf2_uwb_center_pos.pose.position.x = center_pos[0]
+                ekf2_uwb_center_pos.pose.position.y = center_pos[1]
+                ekf2_uwb_center_pos.pose.position.z = center_pos[2]
+                #
+                ekf2_uwb_center_pos_pub.publish(ekf2_uwb_center_pos)
+
 
         if is_imu_data_ready:
             is_imu_data_ready   = False
