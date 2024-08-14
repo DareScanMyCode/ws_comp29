@@ -56,6 +56,13 @@ def generate_launch_description():
         output='screen',
     )      
     
+    comp29_rend_node=Node(
+        package='comp29planner',
+        executable='test_rend',
+        name='test_rend_node',
+        output='screen',
+    )      
+    
     comp29_planner_node=Node(
         package='comp29planner',
         executable='comp29main',
@@ -73,6 +80,7 @@ def generate_launch_description():
         hardware_gport_node,
         hardware_uav_node,
         comp29_detector_node,
+        comp29_rend_node,
         comp29_localization_node,
         comp29_communicate_node,
         comp29_planner_node,

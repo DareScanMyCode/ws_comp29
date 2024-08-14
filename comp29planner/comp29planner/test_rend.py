@@ -9,6 +9,7 @@ import os
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, DurabilityPolicy
 import numpy as np
 from scipy.optimize import minimize
+import json
 
 from sensor_msgs.msg        import Imu
 from geometry_msgs.msg      import PoseStamped
@@ -58,16 +59,27 @@ class RendNode(Node):
 
             depth=1                                    # 历史消息的队列长度
         )
+        self.uav_id = int(os.environ.get('UAV_ID', '-1'))
+        self.local_pos_init = [0.,0.]
+        self.username = os.environ.get('USER', 'cat')
+        self.mis_cfg_file = f'/home/{self.username}/ws_comp29/src/configs/missionCFG.json'
+        # self.mis_cfg_file = '/home/zbw/ws_comp29/src/configs/missionCFG.json'
+        self.mis_cfg = self.load_mis_cfg(self.mis_cfg_file)
+        if self.mis_cfg is not None:
+            self.local_pos_init   = self.mis_cfg['INITIAL_POS'][f'UAV{self.uav_id}'] 
+            self.local_pos_init = [self.local_pos_init[0], self.local_pos_init[1]]
+            
+            
         self.local_pos = [0., 0.]
-        self.local_pos_int = [0., 0.]
-        self.local_pos_fcu = [0., 0.]
+        self.local_pos_fcu = None
+        self.local_pos_fcu_int_base = self.local_pos_init
+        self.POS_RESET_ERR=0.2
         
         self.local_pos_dists = []
         self.dist = 0
         self.dist_got = False
         self.pos_got = False
         self.fcu_pos_got = False
-        self.uav_id = int(os.environ.get('UAV_ID', '-1'))
         if self.uav_id == -1:
             self.get_logger.warn("[rend ctrler]UAV_ID未被设置！！！！")
 
@@ -111,6 +123,44 @@ class RendNode(Node):
         )
         print("ready")
     
+    def load_mis_cfg(self, filepath):
+        """
+        加载任务配置文件
+        """
+        # 检查文件是否存在
+        if not os.path.exists(filepath):
+            self.get_logger().error(f"Config file {filepath} does not exist.")
+            return None
+        
+        # 打开并读取 JSON 文件
+        try:
+            with open(filepath, 'r') as file:
+                config = json.load(file)
+            self.get_logger().info(f"Config file {filepath} loaded successfully.")
+            return config
+        except Exception as e:
+            self.get_logger().error(f"Failed to read config file: {e}")
+            return None
+        
+    def log_mis_cfg(self, config):
+        """
+        打印任务配置文件
+        """
+        if config is None:
+            self.get_logger().error("No configuration to log.")
+            return
+        self.get_logger().info(f">>> {color_codes['green']}============ MISSION CONFIG BEGIN ============{color_codes['reset']}")
+        # 使用 ROS2 logger 打印配置
+        for key, value in config.items():
+            if isinstance(value, dict):
+                self.get_logger().info(f"{key}:")
+                for sub_key, sub_value in value.items():
+                    self.get_logger().info(f"  {sub_key}: {sub_value}")
+            else:
+                self.get_logger().info(f"{key}: {value}")
+        self.get_logger().info(f">>> {color_codes['green']}============= MISSION CONFIG END ============={color_codes['reset']}")
+        # self.logger.info(f">>> {color_codes['green']}MISSION CONFIG READ{color_codes['reset']}")
+    
     def vel_cb(self, msg: TwistStamped):
         self.vel = [msg.twist.linear.x, msg.twist.linear.y]
         self.vel_got = True
@@ -123,16 +173,23 @@ class RendNode(Node):
         pass
     
     def local_pos_ned_est_cb(self, msg: PoseStamped):
+        return
         self.local_pos = [msg.pose.position.x, msg.pose.position.y]
         self.pos_got = True
         # print(22)
         pass
     
     def local_pos_ned_fcu_cb(self, msg: PoseStamped):
-        self.local_pos_fcu = [msg.pose.position.x, msg.pose.position.y]
-        self.fcu_pos_got = True
-        # print(22)
-        pass
+        if self.local_pos_fcu is None:
+            self.local_pos_fcu = [msg.pose.position.x+self.local_pos_fcu_int_base[0], msg.pose.position.y+self.local_pos_fcu_int_base[1]]
+        else:
+            if abs(msg.pose.position.x)<self.POS_RESET_ERR and abs(msg.pose.position.y)<self.POS_RESET_ERR:
+                if abs(msg.pose.position.x - self.local_pos_fcu[0])>self.POS_RESET_ERR or abs(msg.pose.position.y - self.local_pos_fcu[1])>self.POS_RESET_ERR:
+                    self.local_pos_fcu_int_base = self.local_pos_fcu
+            self.local_pos_fcu = [msg.pose.position.x+self.local_pos_fcu_int_base[0], msg.pose.position.y+self.local_pos_fcu_int_base[1]]
+            
+        self.local_pos=[self.local_pos_fcu[0], self.local_pos_fcu[1]]
+        
     
     def solve(self):
         pass

@@ -66,8 +66,8 @@ echo ">>> ROS 2 日志格式已设置为仅包括节点名称、时间和消息�
 
 echo ">>> 设置DISPLAY=:0"
 export DISPLAY=:0
-echo ">>> 设置ROS_LOCALHOST_ONLY=1"
-export ROS_LOCALHOST_ONLY=1
+# echo ">>> 设置ROS_LOCALHOST_ONLY=1"
+# export ROS_LOCALHOST_ONLY=1
 
 echo ">>> 构建与source"
 cd ~/ws_comp29

@@ -1,8 +1,8 @@
 {
     "map_discription": "地图参数设置",
-    "MAP_W": 10,
-    "MAP_L": 50,
-    "MAP_ANGLE": 0,
+    "MAP_W": 5.2,
+    "MAP_L": 7.0,
+    "MAP_ANGLE": 180,
     "DX_PER_LINE": 4,
 
     "Formation_discription": "无人机集群设置",
@@ -12,20 +12,22 @@
     "HERIZON_space": 3.0,
     
     "GROUP_1": [1, 2],
-    "GROUP_2": [3, 5, 6],
-    "GROUP_3": [4, 8],
+    "GROUP_2": [3],
+    "GROUP_3": [4],
+
+    "GUARDS": [2, 3, 4],
 
     "UAV_discription": "无人机参数设置",
-    "UAV_SPEED": 2.0,
-    "UAV_MAX_SPEED": 2.5,
-    "FLIGHT_HEIGHT": 0.9,
+    "UAV_SPEED": 0.25,
+    "UAV_MAX_SPEED": 0.3,
+    "FLIGHT_HEIGHT": 1.05,
     "MIN_DIST": 0.5,
 
     "POS_discription": "无人机初始位置，坐标系为xxx",
     "INITIAL_POS": {
-        "UAV1": [0.0, 0.0],
-        "UAV2": [0.0, 0.0],
-        "UAV3": [0.0, 2.5],
+        "UAV1": [-2.0, 1.5],
+        "UAV2": [0.0, 1.5],
+        "UAV3": [0.0, 3.0],
         "UAV4": [0.0, 0.0],
         "UAV5": [0.0, 0.0],
         "UAV6": [0.0, 0.0],

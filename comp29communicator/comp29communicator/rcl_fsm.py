@@ -548,12 +548,13 @@ def main(args=None):
     )
 
     mission_sub   = node.create_subscription(Int64,         mission_topic_name, mission_cb, qos_profile)
-    position_sub  = node.create_subscription(PoseStamped,  pos_topic_name, pos_cb, qos_profile)
+    # position_sub  = node.create_subscription(PoseStamped,  pos_topic_name, pos_cb, qos_profile)
     velocity_sub  = node.create_subscription(TwistStamped, vel_topic_name, vel_cb, qos_profile)
     uav_info_sub  = node.create_subscription(UAVInfo,      uav_info_topic_name, planner_info_cb, qos_profile)
     uwb_info_sub  = node.create_subscription(Float32MultiArray, uwb_topic_name, uwb_cb, qos_profile)
     gps_pos_sub   = node.create_subscription(PoseStamped, gps_topic_name, gps_cb, qos_profile)
     detected_tgt_sub = node.create_subscription(DetectionResult, detected_tgt_topic_name, detected_tgt_cb, 1)
+    position_fcu_int_sub  = node.create_subscription(PoseStamped,  'pos_ned_fcu_int', pos_cb, qos_profile)
     #
     comm_info_pub = node.create_publisher(CommunicationInfo,  comm_info_topic_name, qos_profile)
     

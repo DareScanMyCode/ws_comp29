@@ -213,7 +213,7 @@ def img_check(path):
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 # basic params
-parser.add_argument('--model_path', type=str, default="/home/cat/ws_comp29/src/weights/best123.rknn", help='model path, could be .pt or .rknn file')
+parser.add_argument('--model_path', type=str, default="/home/cat/ws_comp29/src/weights/best123_3.rknn", help='model path, could be .pt or .rknn file')
 parser.add_argument('--target', type=str, default='rk3588', help='target RKNPU platform')
 parser.add_argument('--device_id', type=str, default=None, help='device id')
 parser.add_argument('--img_show', action='store_true', default=True, help='draw the result and show')
@@ -264,78 +264,140 @@ class NumberDetector(Node):
             self.local_pos_ned_cb, 
             qos_profile
         )
+        self.should_detect_num = False
+        self.gimbal_pos_set_sub  = self.create_subscription(
+            PoseStamped, 
+            'gimbalrpy_setpoint',  
+            self.gimbal_pos_set_cb, 
+            qos_profile
+        )
+        
+        self.mis_sta_sub = self.create_subscription(
+            Int64,
+            '/super_mission_state',
+            self.sup_mis_sta_cb,
+            qos_profile
+        )
+        
+        import threading
+        self.st = threading.Thread(target=self.spin_t, args=())
+        self.st.start()
         
         self.color_publisher = self.create_publisher(Vector3, '/color_offset', 10)
         self.publisher_ = self.create_publisher(DetectionResult, '/number_detected', 10)
         self.publisher_pos_ = self.create_publisher(DetectionResult, '/number_detected_pos', 10)
         self.cap = cv2.VideoCapture(video_path)
         self.ret = False
-        self.timer = self.create_timer(0.05, self.process_frame)
+        self.img_ret = False
+        self.color_detecting = False
+        self.timer = self.create_timer(0.1, self.process_frame)
+        # self.spin_timer = self.create_timer(0.2, self.spin_t)
         self.get_logger().info(">>> Color tracker node has started")
-        
     
+    # def spin_t(self):
+    #     self.get_logger().info("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,,")
+    #     # rclpy.spin_once(self, timeout_sec=0.2)
+    def sup_mis_sta_cb(self, msg:Int64):
+        if msg.data == 2:
+            self.should_detect_num = True
+    def gimbal_pos_set_cb(self, msg:PoseStamped):
+        # self.get_logger().info(">>> Stop detecting number")
+        # return
+        if msg.pose.position.y < 20 and msg.pose.position.y > -20:
+            # 为零时不检测，相机超前
+            self.should_detect_num = False
+            # self.get_logger().info(">>> Stop detecting number")
+        else:
+            return
+            # self.get_logger().info(">>> START detecting number")
+            self.should_detect_num = True
+            
     def local_pos_ned_cb(self,msg):
+        # self.get_logger().info(">>>..>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         self.local_pos_ned=[msg.pose.position.x,msg.pose.position.y,msg.pose.position.z]
     
     def process_frame(self):
-        # ret, self.frame = self.cap.read()
-        if not self.ret:
-            self.get_logger().error("Failed to capture frame")
+        if self.color_detecting:
             return
-        self.frame = self.img
-        # if self.rot == 180:
-        #     self.frame = cv2.rotate(self.frame, cv2.ROTATE_180)
-        hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
-        hsv_color = self.color_blue_hsv
-        lower_bound = np.array([hsv_color[0] - 10, hsv_color[1] - 45, 50])
-        upper_bound = np.array([hsv_color[0] + 10, hsv_color[1] + 45, 255])
+        # self.get_logger().info("oooooooooooo")
+        # ret, self.frame = self.cap.read()
+        if not self.img_ret:
+            # self.get_logger().error("Failed to capture frame")
+            return
+        try:
+            self.color_detecting = True
+            # self.get_logger().info(">>> pub color <<<<<<<<<<<<<<<<<<")
+            self.frame = self.img.copy()
+            # if self.rot == 180:
+            #     self.frame = cv2.rotate(self.frame, cv2.ROTATE_180)
+            hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
+            hsv_color = self.color_blue_hsv
+            lower_bound = np.array([hsv_color[0] - 20, hsv_color[1] - 55, 50])
+            upper_bound = np.array([hsv_color[0] + 20, hsv_color[1] + 45, 255])
 
-        mask = cv2.inRange(hsv_frame, lower_bound, upper_bound)
+            mask = cv2.inRange(hsv_frame, lower_bound, upper_bound)
 
-        kernel = np.ones((5, 5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            kernel = np.ones((5, 5), np.uint8)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            cv2.rectangle(self.frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            if contours:
+                largest_contour = max(contours, key=cv2.contourArea)
+                x, y, w, h = cv2.boundingRect(largest_contour)
+                cv2.rectangle(self.frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-            center_x = x + w // 2
-            center_y = y + h // 2
-            frame_width = self.frame.shape[1]
-            frame_height = self.frame.shape[0]
+                center_x = x + w // 2
+                center_y = y + h // 2
+                frame_width = self.frame.shape[1]
+                frame_height = self.frame.shape[0]
 
-            dx = frame_width  // 2 - center_x
-            dy = frame_height // 2 - center_y
+                dx = frame_width  // 2 - center_x
+                dy = frame_height // 2 - center_y
 
-            # 创建并发布 Vector3 消息
-            msg = Vector3()
-            msg.x = float(dx)
-            msg.y = float(dy)
-            msg.z = 0.0  # z 轴值为 0
-            self.publisher.publish(msg)
+                # 创建并发布 Vector3 消息
+                msg = Vector3()
+                msg.x = float(dx)
+                msg.y = float(dy)
+                msg.z = 0.0  # z 轴值为 0
+                self.color_publisher.publish(msg)
 
-        cv2.imshow("Frame", self.frame)
+            # cv2.imshow("color frame", self.frame)
+            # cv2.waitKey(1)
+        except Exception:
+            self.color_detecting = False
+        self.color_detecting = False
         
+    
+    def spin_t(self):
+        while rclpy.ok():
+            rclpy.spin_once(self,timeout_sec=0.1)
+            
     def run(self):
         #-10s
         last_detect_time=time.time()-10.0
         consecutive_detect_num=0
+        pre_tag=-1
         while rclpy.ok():
             try:
                 self.ret, img_src = self.cap.read()
+                # rclpy.spin_once(self,timeout_sec=0.01)
                 if img_src is None:
                     print("None frame")
                     time.sleep(1)
                     continue
                 if self.rot == 180:
                     img_src = cv2.rotate(img_src, cv2.ROTATE_180)
-                self.img = img_src
-                cv2.imshow("frame", img_src)
-                cv2.waitKey(1)
+                self.img = img_src.copy()
+                self.img_ret = True
+                # cv2.imshow("frame", img_src)
+                # cv2.waitKey(1)
+                # time.sleep(0.02)
+                if not self.should_detect_num:
+                    # time.sleep(0.5)
+                    # self.get_logger().info(">>>>>>>>>>>>>>>>>>>>>>>>>>")
+                    continue
                 '''
                 # using for test input dumped by C.demo
                 img_src = np.fromfile('./input_b/demo_c_input_hwc_rgb.txt', dtype=np.uint8).reshape(640,640,3)
@@ -374,8 +436,8 @@ class NumberDetector(Node):
 
                     if args.img_show:
                         img_p = cv2.resize(img_p, (640, 640))
-                        cv2.imshow("full post process result", img_p)
-                        cv2.waitKey(1)
+                        # cv2.imshow("full post process result", img_p)
+                        # cv2.waitKey(1)
                 
                 #这之后是控制器，根据yolov8有没有检测到目标启动，识别文件的结果是boxes
                 msg = DetectionResult()
@@ -388,7 +450,7 @@ class NumberDetector(Node):
                         # TODO 确认目标类型
                         # 不管啥类型都得发的！
                         if classes[i] in [0,1,2] :
-                            if scores[i] < 0.45:
+                            if scores[i] < 0.70:
                                 continue
                             if scores[i] == max(scores):
                                 # define the landing position
@@ -404,6 +466,12 @@ class NumberDetector(Node):
                                 # 左下方
                                 #     x_mid=(boxes[i, 2])/640
                                 #     y_mid=(boxes[i, 1])/640
+                                if classes[i] != pre_tag:
+                                    pre_tag=classes[i]
+                                    last_detect_time=time.time()
+                                    consecutive_detect_num=1
+                                    continue
+                                
                                 if time.time()-last_detect_time>1.0:#重置
                                   last_detect_time=time.time()
                                   consecutive_detect_num=1
@@ -430,6 +498,9 @@ def main(args=None):
     # ROS init
     rclpy.init()
     node = NumberDetector(VIDEO_PATH)
+    # import threading
+    # spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=False)
+    # spin_thread.start()
     node.run()
  
 

@@ -38,15 +38,20 @@ class Uav2ROSNode(Node):
         # TODO 是否修改成同步发送，收到信息就发送？需要修改UAVOnboard程序
         self.fcu_pub_fps        = self.declare_parameter('fcu_pub_fps', 20.0).get_parameter_value().double_value
         
-        self.mis_state_pub      = self.create_publisher(Int64,             'super_mission_state', 1)
-        self.imu_pub            = self.create_publisher(Imu,               'imu', 1)
-        self.servo_pub          = self.create_publisher(Float32MultiArray, 'servo_data', 1)
-        self.attitude_tgt_pub   = self.create_publisher(Float32MultiArray, 'attitude_setpt', 1)
-        self.local_pos_pub      = self.create_publisher(PoseStamped,       'local_position_ned', 1)
-        self.gps_pos_pub        = self.create_publisher(PoseStamped,       'gps_position', 1)
-        self.velocity_pub       = self.create_publisher(TwistStamped,      'velocity_and_angular', 1)
-        self.lidar_height_pub   = self.create_publisher(Float64,           'lidar_height', 1)
-        self.arm_state_pub      = self.create_publisher(Bool,              'arm_state', 1)
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # 设置可靠性为RELIABLE
+            history=QoSHistoryPolicy.KEEP_LAST,         # 只保留最新的历史消息
+            depth=1                                    # 历史消息的队列长度
+        )
+        self.mis_state_pub      = self.create_publisher(Int64,             'super_mission_state', qos_profile)
+        self.imu_pub            = self.create_publisher(Imu,               'imu', qos_profile)
+        self.servo_pub          = self.create_publisher(Float32MultiArray, 'servo_data', qos_profile)
+        self.attitude_tgt_pub   = self.create_publisher(Float32MultiArray, 'attitude_setpt', qos_profile)
+        self.local_pos_pub      = self.create_publisher(PoseStamped,       'local_position_ned', qos_profile)
+        self.gps_pos_pub        = self.create_publisher(PoseStamped,       'gps_position', qos_profile)
+        self.velocity_pub       = self.create_publisher(TwistStamped,      'velocity_and_angular', qos_profile)
+        self.lidar_height_pub   = self.create_publisher(Float64,           'lidar_height', qos_profile)
+        self.arm_state_pub      = self.create_publisher(Bool,              'arm_state', qos_profile)
         
         self.last_vel_cmd_got_time = None
         
@@ -192,6 +197,7 @@ class Uav2ROSNode(Node):
             mis_msg.data = 3
         elif self.uav.mission_state == DrvCmd.DRV_CMD_EMERGENCY_STOP:
             mis_msg.data = 4
+        # self.get_logger().info(f"[MISSION STATE]: {self.uav.mission_state}")
         self.mis_state_pub.publish(mis_msg)
         # pub IMU
         if should_pub_imu and self.uav.imu_acc is not None:

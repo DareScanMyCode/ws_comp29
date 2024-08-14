@@ -50,10 +50,10 @@ class MovingAverageFilter:
         return sum(self.data) / len(self.data) if len(self.data) != 0 else 0
 
 TARGET_POS_LOCAL = np.array([
-    [1.6,    4.2],
-    [1.6,    2.0],
-    [ 0.,    1.2],
-    [3.2,    1.2],
+    [1.8,    2.3],
+    [1.8,    0.0],
+    [ 0.,    0.0],
+    [3.6,    0.0],
 ], dtype=np.float64)
 
 LEAVING_ID = []
@@ -118,8 +118,15 @@ class Comp29MainNode(Node):
             self.group_2            = self.mis_cfg['GROUP_2']
             self.group_3            = self.mis_cfg['GROUP_3']
             
-            self.group = 1 if self.uav_id in self.group_1 else 2 if self.uav_id in self.group_2 else 3 if self.uav_id in self.group_3 else -1
+            guards = self.mis_cfg['GUARDS']
             
+            self.group = 1 if self.uav_id in self.group_1 else 2 if self.uav_id in self.group_2 else 3 if self.uav_id in self.group_3 else -1
+            self.member_list = self.group_1 if self.group == 1 else self.group_2 if self.group == 2 else self.group_3 if self.group == 3 else []
+            self.member_list = [i for i in self.member_list if i != self.uav_id]
+            self.guard_id = guards[self.group-1]  # 本组的守卫id
+            self.guarded_flag = 0
+            self.ever_seen = [0., 0., 0., 0., 0.]
+
             if self.group == -1:
                 self.get_logger().warn("UAV_ID未被分组！！！！")
             self.get_logger().warn(f"{ColorCodes.green} UAV{self.uav_id} 被分组为 {self.group}{ColorCodes.reset}")
@@ -127,7 +134,7 @@ class Comp29MainNode(Node):
             self.uav_speed          = self.mis_cfg['UAV_SPEED']
             self.filght_height      = self.mis_cfg['FLIGHT_HEIGHT']
             self.min_dist           = self.mis_cfg['MIN_DIST']
-            self.uav_max_speed      = self.mis_cfg['UAV_MAX_SPEED']
+            self.uav_max_speed      = self.mis_cfg['UAV_MAX_SPEED']  # mot used
             
             # 找到初始位置
             self.local_pos_inital   = self.mis_cfg['INITIAL_POS'][f'UAV{self.uav_id}']   # 初始位置
@@ -161,7 +168,7 @@ class Comp29MainNode(Node):
         
         self.local_pos_est = [0., 0.]
         self.local_pos_est_got = False
-        
+        self.arrive_guard_pos = False
         self.dist = None
         self.dist_got = False
         
@@ -201,7 +208,11 @@ class Comp29MainNode(Node):
         self.time_to_leave = None
         # leader 信息
         self.leader_vel_ned = [0., 0., 0.]
-        
+        self.leader_target_index = 0
+        self.leader_target_poss = [[-7.5, 1.5], [-7.5, 3.8], [-1.0, 3.8]]
+        self.leader_target = [-8.5,2.0,0]#ned
+        self.tracking_list = [-1, -1, -1, -1, -1, -1, -1, -1, -1]
+        self.comm_ttt = 0
         # 其他无人机的信息
         self.uav_infos = [UAVInfo() for _ in range(self.num_uav)]
         
@@ -233,10 +244,11 @@ class Comp29MainNode(Node):
         )
         
         # 发布消息
+        self.pos_ned_fcu_int_pub            = self.create_publisher(PoseStamped,   '/pos_ned_fcu_int', qos_profile)
         self.vel_frd_pub            = self.create_publisher(TwistStamped,   '/vel_set_frd', qos_profile)
         self.vel_ned_pub            = self.create_publisher(TwistStamped,   '/vel_set_ned', qos_profile)
         self.arm_cmd_pub            = self.create_publisher(Bool,           '/arm',         qos_profile)
-        self.gimbal_pub             = self.create_publisher(PoseStamped,    '/gimbalrpy_setpoint', qos_profile)
+        self.gimbal_pub             = self.create_publisher(PoseStamped,    'gimbalrpy_setpoint', qos_profile)
         self.local_mis_sta_pub             = self.create_publisher(Int64,    '/mission_state', qos_profile)
         
         # 创建订阅者
@@ -358,7 +370,7 @@ class Comp29MainNode(Node):
         gim_msg = PoseStamped()
         if self.formation_role == AgentRole.ROLE_FORMATION_ANGLE_LEADER:
             gim_msg.header.stamp = self.get_clock().now().to_msg()
-            if self.mission_state == MissionState.MIS_FORMATION:
+            if self.mission_state == MissionState.MIS_FORMATION or self.mission_state in [MissionState.MIS_WAIT, MissionState.MIS_READY, MissionState.MIS_BEGIN]:
                 gim_msg.pose.position.x = 0.0
                 gim_msg.pose.position.y = 0.0
                 gim_msg.pose.position.z = 0.0
@@ -372,6 +384,7 @@ class Comp29MainNode(Node):
             gim_msg.pose.position.y = -90.0
             gim_msg.pose.position.z = 0.0
         self.gimbal_pub.publish(gim_msg)
+        # self.logger.info(f"[MAIN] =============gimbal ctrl: {gim_msg.pose.position.x}, {gim_msg.pose.position.y}, {gim_msg.pose.position.z}")
         
     def watch(self):
         """
@@ -441,13 +454,15 @@ class Comp29MainNode(Node):
         
         
     K_GOTO = 0.5
-    def goto_pos_NED(self, x, y, height):
+    def goto_pos_NED(self, x, y, height=None):
         # 注意坐标系！
         vv_ned = [0.0, 0.0, 0.0]
         if self.local_pos_est is not None:
             # TODO 
             vv_ned[0] = self.K_GOTO * (x - self.local_pos_est[0])
             vv_ned[1] = self.K_GOTO * (y - self.local_pos_est[1])
+            if height is None:
+                height = self.filght_height
             self.height_ctrler.tgt_height = height
         else:
             self.logger.info(f"[MAIN] local pos est is None")
@@ -459,16 +474,17 @@ class Comp29MainNode(Node):
             return False
         if abs(y - self.local_pos_est[1]) > self.GOTO_POS_ERR:
             return False
-            
+        return True
         
     def sup_mis_sta_cb(self, msg:Int64):
+        # self.logger.info(f"GOT MISSSSSSSSSS {msg.data}")
         if msg.data == MissionState.MIS_END:
             self.mission_state = MissionState.MIS_END
             self.logger.info(f"[MAIN] got MISSION {ColorCodes.yellow}END END END{ColorCodes.reset}")
         elif msg.data == MissionState.MIS_STOP:
             self.mission_state = MissionState.MIS_STOP
             self.logger.info(f"[MAIN] got MISSION {ColorCodes.red}STOP STOP STOP{ColorCodes.reset}")
-        elif msg.data == MissionState.MIS_READY and self.mission_ready:
+        elif msg.data == MissionState.MIS_READY and not self.mission_ready:
             self.mission_ready = True
             self.mission_state = MissionState.MIS_READY
             self.logger.info(f"[MAIN] got MISSION {ColorCodes.red}READY READY READY{ColorCodes.reset}")
@@ -487,7 +503,7 @@ class Comp29MainNode(Node):
             if abs(msg.pose.position.x) < self.POS_RESET_ERR and abs(msg.pose.position.y) < self.POS_RESET_ERR:
                 # 如果飞控位置归零，更新累计位置的基准位置为前一时刻的估计位置
                 # 还要判断两个时刻的差值
-                if abs(msg.pose.position.x - self.local_pos_fcu[0]) < self.POS_RESET_ERR and abs(msg.pose.position.y - self.local_pos_fcu[1]) < self.POS_RESET_ERR:
+                if abs(msg.pose.position.x - self.local_pos_fcu[0]) > self.POS_RESET_ERR and abs(msg.pose.position.y - self.local_pos_fcu[1]) > self.POS_RESET_ERR:
                     # 更新基准位置
                     self.local_pos_fcu_int_base = [self.local_pos_fcu[0], self.local_pos_fcu[1]]
             self.local_pos_fcu = [msg.pose.position.x + self.local_pos_fcu_int_base[0],
@@ -495,6 +511,11 @@ class Comp29MainNode(Node):
                                   msg.pose.position.z]
         if not self.use_ekf_pos:
             self.local_pos_est = self.local_pos_fcu
+        fcu_int_pose = PoseStamped()
+        fcu_int_pose.pose.position.x = self.local_pos_fcu[0]
+        fcu_int_pose.pose.position.y = self.local_pos_fcu[1]
+        fcu_int_pose.pose.position.z = self.local_pos_fcu[2]
+        self.pos_ned_fcu_int_pub.publish(fcu_int_pose)
         # # TODO 删掉
         # self.local_pos_est = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
         
@@ -534,20 +555,24 @@ class Comp29MainNode(Node):
             if uav_info.mission_stat == MissionState.MIS_FORMATION_LEAVING:
                 if uav_info.id not in LEAVING_ID:
                     LEAVING_ID.append(uav_info.id)
+                    ADJ_MTX[:][uav_info.id-1] = 0 # 改变脱离的邻接矩阵
+                    self.form_ctrler.update_adj(ADJ_MTX)
+                    self.get_logger().info(
+                        f"id: {uav_info.id} is leaving"
+                    )
                 if len(LEAVING_ID) == 2:
                     self.dx_per_line=self.ori_dx_per_line/2
-                ADJ_MTX[:][uav_info.id-1] = 0 # 改变脱离的邻接矩阵
-                self.form_ctrler.update_adj(ADJ_MTX)
-                self.get_logger().info(
-                    f"id: {uav_info.id} is leaving"
-                )
+                
+            # if self.mission_state == MissionState.MIS_TARGET_WATCHING and uav_info.mission_stat == MissionState.MIS_LANDING and uav_info.group_id in self.member:
+            #     self.guarded_flag += 1
+
         if LEAVING_ID and 2 not in LEAVING_ID:
             if 3 in LEAVING_ID:
                 TARGET_POS_LOCAL = np.array([
-                    [1.6,    4.2],
-                    [ 0.,    1.2],
+                    [1.6,    2.3],
+                    [ 0.,    0.0],
                     [ 0.,    0. ], # 脱离
-                    [3.2,    1.2],
+                    [3.2,    0.0],
                 ], dtype=np.float64)
             else:
                 TARGET_POS_LOCAL = np.array([
@@ -556,24 +581,52 @@ class Comp29MainNode(Node):
                     [ 0.,    1.2],
                     [ 0.,     0.], # 脱离
                 ], dtype=np.float64)
-            self.form_ctrler.update_tgt_pos(TARGET_POS_LOCAL)
+            # self.form_ctrler.update_tgt_pos(TARGET_POS_LOCAL)
         # 本机信息
-        self.tracking_list = msg.tracking_list.data
+        
+        # if self.group in [self.tracking_list[0], self.tracking_list[3], self.tracking_list[6]] and not self.group in self.ever_seen:
+        #     self.tracking_flag = True
+        #     self.tracking_list = msg.tracking_list.data
+        tmp = [int(msg.tracking_list.data[0]), int(msg.tracking_list.data[3]), int(msg.tracking_list.data[6])]
+        for i in range(3):
+            if tmp[i] == -1:
+                continue
+            elif self.ever_seen[tmp[i]-1] == 0:
+                tmp[i] -= 1
+                self.ever_seen[tmp[i]] = 1
+                self.tracking_list[tmp[i]*3] = msg.tracking_list.data[i*3]
+                self.tracking_list[tmp[i]*3+1] = msg.tracking_list.data[i*3+1]
+                self.tracking_list[tmp[i]*3+2] = msg.tracking_list.data[i*3+2]
+        # for i in range(3):
+        #     if i in [int(msg.tracking_list.data[0]), int(msg.tracking_list.data[3]), int(msg.tracking_list.data[6])] and self.ever_seen[i] == 0:
+        #         self.ever_seen[i] = 1
+        #         tracking_list = msg.tracking_list.data
+        #         idx =  [index for index, element in enumerate([tracking_list[0],tracking_list[3],tracking_list[6]]) if int(element) == i]
+        #         self.tracking_list[i*3] = msg.tracking_list.data[idx*3]
+        #         self.tracking_list[i*3+1] = msg.tracking_list.data[idx*3+1]
+        #         self.tracking_list[i*3+2] = msg.tracking_list.data[idx*3+2]
+                
         if self.tracking_list[0] != -1 and self.tracking_list[3] != -1 and self.tracking_list[6] != -1 and not self.all_target_found:
-            self.all_target_found = True
-            self.mission_state = MissionState.MIS_GOTO_GUARD
+            self.all_target_found = True # 只进一次,GOTO_GUARD之后要降落了
+            if self.uav_id != self.guard_id:
+                # 非守卫
+                self.all_target_found = True
+                self.mission_state = MissionState.MIS_GOTO_GUARD
+                self.get_logger().info(
+                    f" {ColorCodes.magenta} 所有目标被找到！ {ColorCodes.reset}"
+                    )
+        self.comm_ttt += 1
+        if self.comm_ttt % 5 == 0:
             self.get_logger().info(
-                f" {ColorCodes.magenta} 所有目标被找到 {ColorCodes.reset}"
+                f"target local: {self.tracking_list} "
+                f"target msgg : {msg.tracking_list.data}"
                 )
-        self.get_logger().info(
-            f"target update: {self.tracking_list} "
-            )
         self.dist_mat = msg.dist_mat.data
         self.guard_list = msg.guard_list.data
         # TODO 更新本机变量
-        if self.mission_state == MissionState.MIS_FORMATION and self.group in [self.tracking_list[0], self.tracking_list[3], self.tracking_list[6]] and self.uav_id in [2,3,4]:
+        if self.mission_state == MissionState.MIS_FORMATION and self.group in [self.tracking_list[0], self.tracking_list[3], self.tracking_list[6]] and self.uav_id != self.leader_id:
             self.mission_state = MissionState.MIS_FORMATION_LEAVING
-            self.get_logger().info("***********change my state************")
+            # self.get_logger().info("***********change my state************")
             # TARGET_POS_LOCAL[self.uav_id-1] = [0., 0.]
             ADJ_MTX[:][self.uav_id-1] = 0
             self.form_ctrler.update_adj(ADJ_MTX)
@@ -608,7 +661,13 @@ class Comp29MainNode(Node):
     DIR_BACK    = 2
     DIR_RIGHT   = 3
     DIR_LEFT    = 4
-    LOOKING_R   = 1.0
+    LOOKING_R   = 0.4
+
+    def list_index_trans(self):
+        # 返回 [目标位置x, 目标位置y, 守卫ID]
+        idx =  [index for index, element in enumerate([self.tracking_list[0],self.tracking_list[3],self.tracking_list[6]]) if element == self.group]
+        idx_g =  [index for index, element in enumerate([self.guard_list[0],self.guard_list[2],self.guard_list[4]]) if element == self.group]
+        return [self.tracking_list[idx[0]*3 + 1], self.tracking_list[idx[0]*3 + 2], self.guard_list[idx_g[0]*2 + 1]]
     
     def leader_ctrl(self):
         """
@@ -620,34 +679,60 @@ class Comp29MainNode(Node):
         往右 10m
         向后 直到 y = 5m
         """
+        
+        # self.leader_target
+        kp_hor=0.3
+        ## NED GOTO 方法
+        # goto [-8.5, 2]  --> goto [-8.5, 5]  --> goto [-2.0, 5]
+        if self.leader_target_index >= len(self.leader_target_poss):
+            return [0., 0., 0.]
+        self.leader_target = self.leader_target_poss[self.leader_target_index]
+        vv_ned = self.goto_pos_NED(self.leader_target[0], self.leader_target[1])
+        vv_ned = np.array(vv_ned) / np.linalg.norm(vv_ned) * self.uav_speed
+        vv_ned = [vv_ned[0], vv_ned[1], 0.0]
+        if self.goto_pose_ready(self.leader_target[0], self.leader_target[1]):
+            self.leader_target_index += 1
+            self.logger.info(f"[LEADER] target index: {self.leader_target_index};  x: {self.leader_target[0]}, y: {self.leader_target[1]}")
+            
+        return vv_ned
         vv_frd = [0., 0., 0.]
         if self.local_pos_est is None:
             self.logger.info(f"[LEADER] local pos est is None")
             return vv_frd  # TODO IMPORTANT
         if self.direc == self.DIR_FRONT:
-            if self.local_pos_est[1] < self.map_l:
+            if self.local_pos_est[1] > -self.map_l:
                 vv_frd = [self.uav_speed, 0., 0.]
+                vv_frd[1]=kp_hor*(self.local_pos_est[1]-self.leader_target[1])
+                
             else:
-                # 准备往右，记录现在的x
-                self.direc = self.DIR_RIGHT
-                self.right_begin_x = self.local_pos_est[0]
+                # 准备往左，记录现在的x
+                
+                self.leader_target=[-7,self.left_begin_x + self.dx_per_line,0]###
+                
+                self.direc = self.DIR_LEFT
+                self.left_begin_x = self.local_pos_est[0]
+                
                 vv_frd = [0., 0., 0.]
-        elif self.direc == self.DIR_RIGHT:
-            if self.local_pos_est[0] < self.right_begin_x + self.dx_per_line:
-                # 往右
-                vv_frd = [0., self.uav_speed, 0.]
+        elif self.direc == self.DIR_LEFT:
+            if self.local_pos_est[0] < self.left_begin_x + self.dx_per_line:
+                # 往左
+                vv_frd = [0., -self.uav_speed, 0.]
+                vv_frd[0]=kp_hor*(self.local_pos_est[0]-self.leader_target[0])
             else:
                 # 往后
+                self.leader_target=[2,self.leader_target[1],0]
                 self.direc = self.DIR_BACK
                 vv_frd = [0., 0., 0.]
         elif self.direc == self.DIR_BACK:
             # 往后知道y=4
-            if self.local_pos_est[1] > 4.0:
+            if self.local_pos_est[1] < -2.0:
                 vv_frd = [-self.uav_speed, 0., 0.]
+                vv_frd[1]=kp_hor*(self.local_pos_est[1]-self.leader_target[1])
             else:
-                # 往右
-                self.right_begin_x = self.local_pos_est[0]
-                self.direc = self.DIR_RIGHT
+                # 往左
+                # self.leader_target=[]
+                self.left_begin_x = self.local_pos_est[0]
+                self.direc = self.DIR_LEFT
                 vv_frd = [0., 0., 0.]
         return vv_frd
     
@@ -663,8 +748,9 @@ class Comp29MainNode(Node):
                 vv_frd = self.form_ctrler.get_ctrl(self.dists)
         elif self.formation_role == AgentRole.ROLE_FORMATION_LEADER:
             # 调用leader control??还是用类？
-            vv_frd = self.form_ctrler.get_ctrl(self.dists)
-            vv_frd = self.leader_ctrl()
+            # vv_frd = self.form_ctrler.get_ctrl(self.dists)
+            # vv_frd = self.leader_ctrl()
+            vv_ned = self.leader_ctrl()
         else:
             # Follower
             vv_frd = self.form_ctrler.get_ctrl(self.dists)
@@ -672,11 +758,11 @@ class Comp29MainNode(Node):
         return [vv_frd[0], vv_frd[1], 0.0]
     
     def formation_leaving(self):
-        self.get_logger().info("***********i'm leaving************")
         if self.time_to_leave is None:
+            self.get_logger().info("***********i'll leavie************")
             self.time_to_leave = time.time()
         vv_ned = [0.,0.,0.]
-        if self.local_pos_est is None or time.time() - self.time_to_leave<4.0:
+        if self.local_pos_est is None or time.time() - self.time_to_leave < 0.5:
             return [0., 0., 0.]
         # time.sleep(2.0) # 等其他人先走一走
         # TODO 看具体数字？
@@ -691,7 +777,7 @@ class Comp29MainNode(Node):
             tgt_x = self.tracking_list[self.group * 3 - 2]
             tgt_y = self.tracking_list[self.group * 3 - 1]
             self.get_logger().info(
-                f'=========={tgt_x - self.local_pos_est[0]},{tgt_y - self.local_pos_est[1]}============'
+                f'==========leaving: {tgt_x - self.local_pos_est[0]:.2f},{tgt_y - self.local_pos_est[1]:.2f}============'
             )
             if abs(tgt_x - self.local_pos_est[0]) > 2:
                 vv_ned = [self.uav_speed*((tgt_x - self.local_pos_est[0])/abs(tgt_x - self.local_pos_est[0])), 0., 0.]
@@ -701,10 +787,11 @@ class Comp29MainNode(Node):
                 else:
                     self.mission_state = MissionState.LOOKING_AROUND
                     self.local_pos_start = self.local_pos_est
-                    self.LOOKING_R = 2.0
+                    self.LOOKING_R = 0.4
                     vv_ned = [0.,0.,0.]
         return vv_ned
     
+    LOOKING_AROUND_SPD = 0.5
     def looking_around(self):
         """
         附近瞎逛
@@ -718,54 +805,68 @@ class Comp29MainNode(Node):
         
         if self.direc == self.DIR_FRONT:
             if self.local_pos_est[1] - self.local_pos_start[1] < self.LOOKING_R:
-                vv_ned = [ 0.,self.uav_speed, 0.]
+                vv_ned = [ 0.,self.LOOKING_AROUND_SPD, 0.]
             else:
                 self.direc = self.DIR_RIGHT
                 vv_ned = [0.0, 0.0, 0.0]
         elif self.direc == self.DIR_RIGHT:
             if self.local_pos_est[0] - self.local_pos_start[0] < self.LOOKING_R:
-                vv_ned = [self.uav_speed, 0., 0.]
+                vv_ned = [self.LOOKING_AROUND_SPD, 0., 0.]
             else:
                 self.direc = self.DIR_BACK
                 vv_ned = [0.0, 0.0, 0.0]
         elif self.direc == self.DIR_BACK:
             if self.local_pos_start[1]  - self.local_pos_est[1] < self.LOOKING_R:
-                vv_ned = [ 0.,-self.uav_speed, 0.]
+                vv_ned = [ 0.,-self.LOOKING_AROUND_SPD, 0.]
             else:
                 self.direc = self.DIR_LEFT
                 vv_ned = [0.0, 0.0, 0.0]
         elif self.direc == self.DIR_LEFT:
             if self.local_pos_start[0]  - self.local_pos_est[0] < self.LOOKING_R:
-                vv_ned = [-self.uav_speed, 0., 0.]
+                vv_ned = [-self.LOOKING_AROUND_SPD, 0., 0.]
             else:
                 self.direc = self.DIR_FRONT
                 vv_ned = [0.0, 0.0, 0.0]
-                self.LOOKING_R += 1.0
+                self.LOOKING_R += 0.4
         return vv_ned
 
     
     def target_watch_ctrl(self):
         # TODO 只是守着目标，不降落
-        self.get_logger().info(f'wathcing for {self.tracking_list[self.group * 3 - 2]},{self.tracking_list[self.group * 3 - 2]}=========')
+        # self.get_logger().info(f'=======wathcing for {self.list_index_trans[0]},{self.list_index_trans[1]}=========')
         vv_frd = [0.0, 0.0, 0.0]
+        # 如果同组飞机都是降落模式，就允许降落
+        should_land = True
+        for member in self.member_list:
+            if self.uav_infos[member-1].mission_stat != MissionState.MIS_LANDING:
+                should_land = False
+                break
         if self.number_detected_state:
             if self.detected_result.detected_num == self.group:
+                if should_land:
+                    self.mission_state = MissionState.MIS_LANDING
+                    return vv_frd
                 # TODO 确认pose
-                # self.get_logger().info(f"detected_pose:{self.detected_result.detected_pose[0], self.detected_result.detected_pose[1]}  ")
+                # if len(self.member_list)-1 == self.guarded_flag:
+                    
+                #     # self.get_logger().info(f"detected_pose:{self.detected_result.detected_pose[0], self.detected_result.detected_pose[1]}  ")
+                #     vv_frd, final_land_flag = self.land_ctrler.land_ctrl(self.detected_result.detected_pose[0], self.detected_result.detected_pose[1], self.lidar_height)
+                #     # 只要开始final_land 之后即便识别到也不管
+                #     # self.final_land_flag = self.final_land_flag or final_land_flag
+                #     self.logger.debug(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
+                # else:
                 vv_frd, final_land_flag = self.land_ctrler.land_ctrl(self.detected_result.detected_pose[0], self.detected_result.detected_pose[1], self.lidar_height)
-                # 只要开始final_land 之后即便识别到也不管
-                self.final_land_flag = self.final_land_flag or final_land_flag
-                self.logger.debug(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
+                # vv_frd = [0.,0.,0.] # TODO 只是守着目标，不降落
                 return vv_frd
             else:
                 self.logger.debug(f"[LAND] 检测到目标{self.detected_result.detected_num}，但不是目标{self.group}")
                 return vv_frd
         else:
-            self.logger.debug(f"未检测到目标")
+            self.logger.info(f"目标检测超时")
             # TODO 附近瞎逛或者离检测到的飞机近一点
             self.mission_state = MissionState.LOOKING_AROUND
             self.local_pos_start = self.local_pos_est
-            self.LOOKING_R = 1.0
+            self.LOOKING_R = 0.4
             # vv_frd = self.looking_around()
             return vv_frd
         
@@ -779,7 +880,7 @@ class Comp29MainNode(Node):
             if self.lidar_height >= 0.2:
                 if self.final_land_flag:
                     self.logger.debug(f"[LAND] final land flag is True")
-                    vv_frd = [0., 0., 0.15]
+                    vv_frd = [0., 0., 0.25]
                     return vv_frd
                 else:
                     if self.number_detected_state:
@@ -789,13 +890,14 @@ class Comp29MainNode(Node):
                             vv_frd, final_land_flag = self.land_ctrler.land_ctrl(self.detected_result.detected_pose[0], self.detected_result.detected_pose[1], self.lidar_height)
                             # 只要开始final_land 之后即便识别到也不管
                             self.final_land_flag = self.final_land_flag or final_land_flag
-                            self.logger.debug(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
+                            self.logger.info(f"[LAND] detected num: {self.detected_result.detected_num}, group: {self.group}, vel: {vv_frd}")
                             return vv_frd
                         else:
-                            self.logger.debug(f"[LAND] 检测到目标{self.detected_result.detected_num}，但不是目标{self.group}")
+                            self.logger.info(f"[LAND] 检测到目标{self.detected_result.detected_num}，但不是目标{self.group}")
                             return vv_frd
                     else:
-                        self.logger.debug(f"未检测到目标")
+                        self.logger.info(f"未检测到目标，直接降落！")
+                        vv_frd = [0, 0, 0.25]
                         # TODO 附近瞎逛或者离检测到的飞机近一点
                         # vv_frd = self.looking_around()
                         return vv_frd
@@ -810,26 +912,43 @@ class Comp29MainNode(Node):
         """
         # 距离远的时候使用之前的估计位置
         # 距离近的时候使用rendezvous方法
-        return [0.0, 0., 0.]
-        if self.dists[self.landmark_uav_id] > 5.:
+        # return [0.0, 0., 0.]
+        # TODO
+        vv_ned = [0.0, 0.0, 0.0]
+        
+        if self.dists[self.guard_id] > 3. and not self.arrive_guard_pos:
             # TODO 应该是距离估计比较准之后切换
             # 使用之前的估计位置
-            
-            pass
+            # vv_ned = self.goto_pos_NED(self.list_index_trans()[0], self.list_index_trans()[1], self.filght_height)
+            vv_ned = self.goto_pos_NED(self.uav_infos[self.guard_id].pos.pose.position.x, 
+                                       self.uav_infos[self.guard_id].pos.pose.position.y, 
+                                       self.filght_height)
+            if abs(vv_ned[0]) < 0.05 and abs(vv_ned[1]) < 0.05:
+                # 到达目标位置，但距离还是很远
+                self.arrive_guard_pos = True
+                pass
+            self.logger.info(f"[main] GOTO guard pos: {self.uav_infos[self.guard_id].pos.position.x:.2f}, {self.uav_infos[self.guard_id].pos.position.y:.2f}")
         else:
             # 使用rendezvous方法
+            # 或者 looking around
             if self.guard_pos_ned_est is not None:
                 vv_ned = self.goto_pos_NED(self.guard_pos_ned_est[0], self.guard_pos_ned_est[1], self.filght_height)
+                self.logger.info(f"[main] REND guard pos: {self.guard_pos_ned_est[0]:.2f}, {self.guard_pos_ned_est[1]:.2f}")
             else:
                 self.logger.warn("[main] no guard got!")
             pass
+        return vv_ned
         pass
     
     def uav_setup(self):
         # 等待初始化与网络连接
+        tt = 0
         while self.mission_state == MissionState.MIS_WAIT:
-            self.logger.info("[MAIN] 等待任务开始")
-            time.sleep(1)
+            tt+=1
+            if tt % 10 == 0:
+                self.logger.info(f"{ColorCodes.green}[MAIN] 等待任务开始{ColorCodes.reset}")
+            rclpy.spin_once(self)
+            time.sleep(0.2)
         if self.mission_state == MissionState.MIS_READY:
             # TODO 解锁起飞
             self.arm_cmd_pub.publish(Bool(data=True))
@@ -839,13 +958,14 @@ class Comp29MainNode(Node):
             self.logger.info("[MAIN] 起飞")
             pass
         elif self.mission_state == MissionState.MIS_BEGIN:
+            self.logger.info(f"{ColorCodes.magenta}[MAIN] 等待任务开始{ColorCodes.reset}")
             # 开始任务
             return True
         pass
         
     def run(self):
         # 初始化无人机
-        # self.uav_setup()
+        self.uav_setup()
         
         # 执行任务
         while True:
@@ -858,7 +978,7 @@ class Comp29MainNode(Node):
         vv = r_hat / np.linalg.norm(r_hat)
         MAX_SIZE = 3000
         TIME_STEP = 0.1
-        MAX_SPD = 0.3
+        MAX_SPD = 0.43
         MIN_SPD = 0.02
         MIN_DIST = 1.1
         self.vel_pub_count = 0
@@ -871,6 +991,7 @@ class Comp29MainNode(Node):
                 rclpy.spin_once(self)
                 vv_frd = [0.0, 0.0, 0.0]
                 vv_ned = None
+                force_frd = False
                 # 根据状态执行任务
                 if self.mission_state == MissionState.MIS_WAIT:
                     # 收到地面站指令之后进入formation
@@ -878,6 +999,11 @@ class Comp29MainNode(Node):
                 elif self.mission_state == MissionState.MIS_FORMATION:
                     # 收到地面站指令
                     vv_frd = self.formation_ctrl()
+                    if self.formation_role == AgentRole.ROLE_FORMATION_LEADER:
+                        # force_frd = True
+                        pass
+                    if self.formation_role == AgentRole.ROLE_FORMATION_LEADER:
+                        vv_ned = self.leader_ctrl()
                     pass
                 elif self.mission_state == MissionState.MIS_FORMATION_LEAVING:
                     # 进入：自己是该走的那一个，并且自己那一组的目标被发现了
@@ -893,7 +1019,7 @@ class Comp29MainNode(Node):
                 elif self.mission_state == MissionState.MIS_GOTO_GUARD:
                     # 进入：当任务时间到达/任务结束/所有目标找到时
                     # 离开：本组目标距离较近时，准备降落（离guard比较近的时候）
-                    self.rend_ctrl()
+                    vv_ned = self.rend_ctrl()
                     
                 # elif self.mission_state == MissionState.MIS_BASE_MOVE:
                     # pass
@@ -923,9 +1049,9 @@ class Comp29MainNode(Node):
                     vel_ned_msg.twist.linear.z = vv[2] 
                     self.vel_ned_pub.publish(vel_ned_msg)
                     self.vel_pub_count += 1
-                    if self.vel_pub_count % 10 == 0:
+                    if self.vel_pub_count % 15 == 0:
                         self.logger.info(
-                            f"[MAIN]  {ColorCodes.cyan} mis sta {self.mission_state} vNED{ColorCodes.reset}: {vel_ned_msg.twist.linear.x :4.2f}, {vel_ned_msg.twist.linear.y:4.2f}, {vv[2]:4.2f} "
+                            f"{ColorCodes.cyan} mis {self.mission_state} NED: {vel_ned_msg.twist.linear.x :4.2f}, {vel_ned_msg.twist.linear.y:4.2f}, {vv[2]:4.2f}; x {self.local_pos_est[0]:4.1f}, y {self.local_pos_est[1]:4.1f}{ColorCodes.reset}"
                         )
                     time.sleep(0.05)
                     continue
@@ -938,10 +1064,12 @@ class Comp29MainNode(Node):
                 vv[1] = self.vel_frd_set_y_filter.get_value(vv[1])
                 vv[2] = vv[2]
                 vel_type = 2  # 1:ned, 2:frd
+                
                 # frd to ned
-                if np.linalg.norm(self.rpy)>0:# 还没收到imu就不改了
+                if np.linalg.norm(self.rpy)>0 and not force_frd:# 还没收到imu就不改了
                     vel_type = 1 # ned
-                    yaw = self.rpy[2]
+                    yaw = self.rpy[0]
+                    # self.logger.info(f"=============rpy: {self.rpy[0]},  {self.rpy[1]},  {self.rpy[2]}")
                     # TODO 后面变成ned了
                     vv = np.array([
                         vv[0]*math.cos(yaw) - vv[1]*math.sin(yaw),
@@ -968,19 +1096,19 @@ class Comp29MainNode(Node):
                 #     f"d:{self.dists[0] :6.2f} {self.dists[1] :6.2f} {self.dists[2] :6.2f} {self.dists[3] :6.2f} == " + 
                 #     f"v frd: {vv[0]:4.2f}, {vv[1]:4.2f}, {vv[2]:4.2f} ; h:{self.lidar_height} "
                 # )
-                if vel_type == 1: # NED
+                if vel_type == 1 and not force_frd: # NED
                     self.vel_ned_pub.publish(vel_frd_msg)
                     self.vel_pub_count += 1
-                    if self.vel_pub_count % 10 == 0:
+                    if self.vel_pub_count % 15 == 0:
                         self.logger.info(
-                            f"[MAIN]  {ColorCodes.cyan} mis sta {self.mission_state} vNED{ColorCodes.reset}: {vel_frd_msg.twist.linear.x :4.2f}, {vel_frd_msg.twist.linear.y:4.2f}, {vv[2]:4.2f} "
+                            f"{ColorCodes.cyan} mis {self.mission_state} vNED: {vel_frd_msg.twist.linear.x :4.2f}, {vel_frd_msg.twist.linear.y:4.2f}, {vv[2]:4.2f}; x {self.local_pos_est[0]:4.1f}, y {self.local_pos_est[1]:4.1f}{ColorCodes.reset}"
                         )
                 else:
                     self.vel_frd_pub.publish(vel_frd_msg)
                     self.vel_pub_count += 1
-                    if self.vel_pub_count % 10 == 0:
+                    if self.vel_pub_count % 15 == 0:
                         self.logger.info(
-                            f"[MAIN]  {ColorCodes.cyan} mis sta {self.mission_state} vFRD{ColorCodes.reset}: {vel_frd_msg.twist.linear.x :4.2f}, {vel_frd_msg.twist.linear.y:4.2f}, {vv[2]:4.2f} "
+                            f"{ColorCodes.green} mis {self.mission_state} vFRD: {vel_frd_msg.twist.linear.x :4.2f}, {vel_frd_msg.twist.linear.y:4.2f}, {vv[2]:4.2f}; x {self.local_pos_est[0]:4.1f}, y {self.local_pos_est[1]:4.1f}{ColorCodes.reset}"
                         )
                 # rclpy.spin_once(self)
                 

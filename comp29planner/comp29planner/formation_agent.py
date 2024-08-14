@@ -45,6 +45,9 @@ class Leader:
         # self.tgt_pos_local = self.tgt_pos-self.tgt_pos[self.index_id]
         # self.tgt_dist = np.linalg.norm(self.tgt_pos_local, axis=1)
         # self.dist_only_agent.update_tgt_pos(new_pos=new_pos)
+    
+    def update_adj(self, aaa):
+        return
 
     
 class AngleLeader:
