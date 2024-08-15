@@ -31,7 +31,7 @@ class LandController():
         self.dy = 0.
         self.Quadrant = 0
         self.land_pos = land_pos
-        self.min_height = 0.9
+        self.min_height = 0.7
         
         # TODO 根据land_pos来设定停机位置
         if self.land_pos == 'left_top':

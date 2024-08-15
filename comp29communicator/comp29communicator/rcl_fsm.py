@@ -593,6 +593,7 @@ def main(args=None):
             # detected tgt
             if is_tgt_updated:
                 fsm_t.update(tgt = [int(detected_tgt.object_name.data), detected_tgt.position.x, detected_tgt.position.y])
+                # node.get_logger().info(f"==== DETECT DATA: {int(detected_tgt.object_name.data)}, {detected_tgt.position.x}")
                 is_tgt_updated = False
 
             # 

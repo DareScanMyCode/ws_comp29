@@ -95,7 +95,7 @@ class RendNode(Node):
         self.local_pos_ned_est_sub        = self.create_subscription(
             PoseStamped, 
             # TODO 换成local_pos_est
-            ekf2_pos_topic_name, 
+            'pos_ned_fcu_int', 
             self.local_pos_ned_est_cb, 
             qos_profile
         )
@@ -173,7 +173,7 @@ class RendNode(Node):
         pass
     
     def local_pos_ned_est_cb(self, msg: PoseStamped):
-        return
+        # return
         self.local_pos = [msg.pose.position.x, msg.pose.position.y]
         self.pos_got = True
         # print(22)
@@ -268,8 +268,8 @@ class RendNode(Node):
             p_opts[step, :] = p_opt
             
             pos_opt_msg = PoseStamped()
-            pos_opt_msg.position.x = self.opt_pos_x_filter.get_value(p_opt[0])
-            pos_opt_msg.position.y = self.opt_pos_y_filter.get_value(p_opt[1])
+            pos_opt_msg.pose.position.x = self.opt_pos_x_filter.get_value(p_opt[0])
+            pos_opt_msg.pose.position.y = self.opt_pos_y_filter.get_value(p_opt[1])
             self.guard_pos_est_ned.publish(pos_opt_msg)
             rclpy.spin_once(self)
             time.sleep(0.1)

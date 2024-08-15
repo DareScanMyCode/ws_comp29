@@ -450,7 +450,7 @@ class NumberDetector(Node):
                         # TODO 确认目标类型
                         # 不管啥类型都得发的！
                         if classes[i] in [0,1,2] :
-                            if scores[i] < 0.70:
+                            if scores[i] < 0.80:
                                 continue
                             if scores[i] == max(scores):
                                 # define the landing position

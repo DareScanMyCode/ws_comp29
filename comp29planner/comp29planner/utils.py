@@ -92,8 +92,8 @@ class ColorCodes:
     reset='\033[0m'
     
 rend_tgt = {
-    1:2,
-    2:2,
+    1:1,
+    2:1,
     3:3,
     4:4
 }
