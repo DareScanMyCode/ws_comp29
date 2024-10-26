@@ -59,11 +59,11 @@ TARGET_POS_LOCAL = np.array([
 LEAVING_ID = []
 
 """
-       1
+X      1
      / | \
    /   |   \
  /     |     \
-3------2-------4
+3------2-------4 Y
 """
 
 """
@@ -85,17 +85,107 @@ ADJ_MTX = np.array([
 ], dtype=np.int64)
 
 
+## 8架
+"""
+1 2 3 4 5 6 7 8 9 0 1 2 3 4
+          /-1-\            16
+        /   |   \          14
+      /     |     \        12
+    3-------2------4       10
+   / \    /  \    / \      8
+  /   \ /     \  /   \     6
+ /     5-\---/-6      \    4
+/ ____/    X   \______ \   2
+7--------/---\----------8  0
+
+"""
+TARGET_POS_LOCAL = np.array([
+    [7,    16],
+    [7,    10.0],
+    [3.,   10.0],
+    [11,   10.0],
+    [5,    4.0],
+    [9,    4.0],
+    [1,    0.0],
+    [13,   0.0],
+], dtype=np.float64)
+
+ADJ_MTX = np.array([
+#    1  2  3  4  5  6  7  8
+    [0, 0, 0, 0, 0, 0, 0, 0],  # 1
+    [1, 0, 0, 0, 0, 0, 0, 0],  # 2
+    [1, 1, 0, 0, 0, 0, 0, 0],  # 3
+    [1, 1, 0, 0, 0, 0, 0, 0],  # 4
+    [0, 1, 1, 1, 0, 0, 0, 0],  # 5
+    [0, 1, 1, 1, 0, 0, 0, 0],  # 6
+    [0, 1, 0, 0, 1, 1, 0, 0],  # 7
+    [0, 0, 0, 1, 1, 1, 0, 0],  # 8
+], dtype=np.int64)
+
+
+## 6架
+"""
+1 2 3 4 5 6 7 8 9 0 1 2 3 4
+          /-1-\            16
+        /   |   \          14
+      /     |     \        12
+    3-------2-------4       10
+   / \    /   \    / \      8
+  /   \ /      \  /   \     6
+ /  O  5-\-----/-6     \    4
+"""
+TARGET_POS_LOCAL = np.array([
+    [2,    4],
+    [2,    2.0],
+    [0.,   2.0],
+    [4,    2.0],
+    [1,    0.0],
+    [3,    0.0],
+], dtype=np.float64)
+TARGET_POS_LOCAL = TARGET_POS_LOCAL/2
+TARGET_POS_LOCAL = np.array([
+    [7,    16],
+    [7,    10.0],
+    [3.,   10.0],
+    [11,   10.0],
+    [5,    4.0],
+    [9,    4.0],
+], dtype=np.float64)
+TARGET_POS_LOCAL = np.array([
+    [2,    4],
+    [2,    2.0],
+    [0.,   2.0],
+    [4,    2.0],
+    [1,    0.0],
+    [3,    0.0],
+], dtype=np.float64)
+ADJ_MTX = np.array([
+#    1  2  3  4  5  6 
+    [0, 0, 0, 0, 0, 0],  # 1
+    [1, 0, 1, 1, 0, 0],  # 2 观测34是为了保险，怕颜色丢掉
+    [1, 1, 0, 0, 0, 0],  # 3
+    [1, 1, 0, 0, 0, 0],  # 4
+    [0, 1, 1, 1, 0, 0],  # 5
+    [0, 1, 1, 1, 0, 0],  # 6
+], dtype=np.int64)
+
+
 class Comp29MainNode(Node):
     def __init__(self, args):
         super().__init__('main_planner_node')
         self.logger = self.get_logger()
         self.declare_parameter('use_ekf_pos', True)
+        self.declare_parameter('uav_id', -1)
         self.use_ekf_pos = self.get_parameter('use_ekf_pos').get_parameter_value().bool_value
+        self.uav_id_ros  = self.get_parameter('uav_id').get_parameter_value().integer_value
         
         # 参数
         self.uav_id = int(os.environ.get('UAV_ID', '-1'))
+        # TODO delete
+        # self.uav_id = self.uav_id_ros
         if self.uav_id == -1:
             self.get_logger().warn("UAV_ID未被设置！！！！")
+            self.uav_id = self.uav_id_ros
         
         # 读取任务配置文件
         self.username = os.environ.get("USER", 'cat')
@@ -245,13 +335,16 @@ class Comp29MainNode(Node):
         )
         
         # 发布消息
-        self.pos_ned_fcu_int_pub            = self.create_publisher(PoseStamped,   '/pos_ned_fcu_int', qos_profile)
-        self.vel_frd_pub            = self.create_publisher(TwistStamped,   '/vel_set_frd', qos_profile)
-        self.vel_ned_pub            = self.create_publisher(TwistStamped,   '/vel_set_ned', qos_profile)
-        self.arm_cmd_pub            = self.create_publisher(Bool,           '/arm',         qos_profile)
-        self.gimbal_pub             = self.create_publisher(PoseStamped,    'gimbalrpy_setpoint', qos_profile)
-        self.local_mis_sta_pub             = self.create_publisher(Int64,    '/mission_state', qos_profile)
-        
+        self.pos_ned_fcu_int_pub            = self.create_publisher(PoseStamped,    '/pos_ned_fcu_int', qos_profile)
+        self.vel_frd_pub                    = self.create_publisher(TwistStamped,   '/vel_set_frd',     qos_profile)
+        self.vel_ned_pub                    = self.create_publisher(TwistStamped,   '/vel_set_ned',     qos_profile)
+        self.arm_cmd_pub                    = self.create_publisher(Bool,           '/arm',             qos_profile)
+        self.gimbal_pub                     = self.create_publisher(PoseStamped,    'gimbalrpy_setpoint', qos_profile)
+        self.local_mis_sta_pub              = self.create_publisher(Int64,          '/mission_state',   qos_profile)
+        # while rclpy.ok():
+        #     self.local_mis_sta_pub.publish(Int64(data=self.uav_id))
+        #     # self.logger.info(f"publish {self.uav_id}")
+        #     time.sleep(0.5)
         # 创建订阅者
         ekf2_pos_topic_name = '/uav' + str(self.uav_id) + "/ekf2/pose"
         comm_topic_name = '/uav' + str(self.uav_id) + '/comm_info'
@@ -922,18 +1015,18 @@ class Comp29MainNode(Node):
         # 距离远的时候使用之前的估计位置
         # 距离近的时候使用rendezvous方法
         # return [0.0, 0., 0.]
-        # TODO
+        # TODO 确认id
         vv_ned = [0.0, 0.0, 0.0]
-        if self.dists[self.guard_id] <= 0.8:
+        if self.dists[self.guard_id-1] <= 8:
             self.logger.info(f"====== UAV {self.uav_id} switch to LAND from REND")
             self.mission_state = MissionState.MIS_LANDING
             return vv_ned
-        if self.dists[self.guard_id] > 0.8 and not self.arrive_guard_pos:
+        if self.dists[self.guard_id-1] > 8 and not self.arrive_guard_pos:
             # TODO 应该是距离估计比较准之后切换
             # 使用之前的估计位置
             # vv_ned = self.goto_pos_NED(self.list_index_trans()[0], self.list_index_trans()[1], self.filght_height)
-            vv_ned = self.goto_pos_NED(self.uav_infos[self.guard_id].pos.pose.position.x, 
-                                       self.uav_infos[self.guard_id].pos.pose.position.y, 
+            vv_ned = self.goto_pos_NED(self.uav_infos[self.guard_id-1].pos.pose.position.x, 
+                                       self.uav_infos[self.guard_id-1].pos.pose.position.y, 
                                        self.filght_height)
             if abs(vv_ned[0]) < 0.05 and abs(vv_ned[1]) < 0.05:
                 # 到达目标位置，但距离还是很远
@@ -981,11 +1074,12 @@ class Comp29MainNode(Node):
         
         # 执行任务
         while True:
+            self.logger.info(f"{ColorCodes.red}[main] DIS NOT GOT{ColorCodes.reset}")
             rclpy.spin_once(self)
             if self.dist_got:
                 break
             else:
-                time.sleep(0.2)
+                time.sleep(0.5)
         r_hat = np.array([5, 0])
         vv = r_hat / np.linalg.norm(r_hat)
         MAX_SIZE = 3000
@@ -1004,6 +1098,25 @@ class Comp29MainNode(Node):
                 vv_frd = [0.0, 0.0, 0.0]
                 vv_ned = None
                 force_frd = False
+                
+                ####### 测试 #######
+                ## rend 
+                ## 测试方法：id1 为 id2 的guard，并置位
+                # if True:
+                #     self.mission_state = MissionState.MIS_GOTO_GUARD
+                #     self.logger.info(f"[TESTING] [REND] guard_id: {self.guard_id}@{self.uav_infos[self.guard_id-1].pos.pose.position.x:6.2f}{self.uav_infos[self.guard_id-1].pos.pose.position.y:6.2f}. I'm @ {self.local_pos_est[0]:6.2f}, {self.local_pos_est[1]:6.2f}")
+                
+                ## Formation only
+                ## 测试方法：第一台飞机手飞或程控，前往指定地点
+                ## 第二台飞机控制方向
+                ## 其余飞机组成编队
+                
+                if True:
+                    self.mission_state = MissionState.MIS_FORMATION
+                    # self.logger.info(f"[TESTing] [FROMATION] vvfrd:{}")
+                ####### 测试 END #######
+                
+                
                 # 根据状态执行任务
                 if self.mission_state == MissionState.MIS_WAIT:
                     # 收到地面站指令之后进入formation
@@ -1011,6 +1124,7 @@ class Comp29MainNode(Node):
                 elif self.mission_state == MissionState.MIS_FORMATION:
                     # 收到地面站指令
                     vv_frd = self.formation_ctrl()
+                    self.logger.info(f"formation frd{vv_frd[0]:5.2f}, {vv_frd[1]:5.2f}")
                     if self.formation_role == AgentRole.ROLE_FORMATION_LEADER:
                         # force_frd = True
                         pass

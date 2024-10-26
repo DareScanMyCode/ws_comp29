@@ -51,7 +51,7 @@ class Leader:
 
     
 class AngleLeader:
-    def __init__(self, index_id, adj_mtx, tgt_pos, leader_index_id, k_dist=0.1, k_img=0.0005) -> None:
+    def __init__(self, index_id, adj_mtx, tgt_pos, leader_index_id, k_dist=0.15, ki_dist=0.003, k_img=0.001, ki_img=0.00001) -> None:
         """
         第二leader，负责带动整个队形运动，控制自身与leader之间的角度。
         """
@@ -65,7 +65,11 @@ class AngleLeader:
         # print(self.leader_index_id)
         self.k_dist = k_dist
         self.k_img  = k_img
-        self.dist_only_agent = Follower(self.index_id, self.adj_mtx, self.tgt_pos, self.k_dist)
+        self.dist_err_int = 0.
+        self.img_err_int = 0.
+        self.ki_dist = ki_dist
+        self.ki_img = ki_img
+        self.dist_only_agent = Follower(self.index_id, self.adj_mtx, self.tgt_pos, self.k_dist,self.ki_dist)
         pass
     
     def update_adj(self, new_adj):
@@ -85,11 +89,17 @@ class AngleLeader:
         if dx is not None:
             # 有dx，有观测到leader的角度，只控制与leader的相对位置
             leader_dist_err = self.tgt_dist[self.leader_index_id] - dist[self.leader_index_id]
+            self.dist_err_int += leader_dist_err
+            self.dist_err_int = 100 if self.dist_err_int > 100 else self.dist_err_int
+            self.dist_err_int = -100 if self.dist_err_int < -100 else self.dist_err_int
             # 此处假设要让leader在自己的正前方，即dist控制前后，dx控制左右，
             # dist err 为正，距离过近，速度向后
-            vf = - self.k_dist * leader_dist_err
+            vf = - (self.k_dist * leader_dist_err + self.ki_dist * self.dist_err_int)
             # print(f"[1111] dist_err={leader_dist_err}")
             # dx为正，leader在左边！（dx为期望像素坐标-img中leader的像素坐标），左上角为零，向左
+            self.img_err_int += dx
+            self.img_err_int = 10000 if self.img_err_int > 10000 else self.img_err_int
+            self.img_err_int = -10000 if self.img_err_int < -10000 else self.img_err_int
             if math.fabs(dx) < 30:
                 vr = 0.0
             else:
@@ -101,7 +111,7 @@ class AngleLeader:
         return vv_frd
     
 class Follower:
-    def __init__(self, index_id, adj_mtx, tgt_pos, k_dist=0.1) -> None:
+    def __init__(self, index_id, adj_mtx, tgt_pos, k_dist=0.1, ki_dist=0.001) -> None:
         """
         纯正的follower，观测，运动
         """
@@ -113,6 +123,9 @@ class Follower:
         # print(self.tgt_pos_local)
         # print(self.tgt_dist)
         self.k_dist = k_dist
+        self.ki_dist = ki_dist
+        self.error_int = None
+        
         pass
     
     def update_adj(self, new_adj):
@@ -133,9 +146,22 @@ class Follower:
         # print(self.adj_mtx[self.index_id, :])
         # print(dist)
         # print(self.target_dist)
-        vel_local = self.k_dist * np.dot(np.transpose(self.tgt_pos_local),
+        # TODO PID(PI)
+        err = np.dot(np.transpose(self.tgt_pos_local),
                                     np.transpose(np.multiply( self.adj_mtx[self.index_id, :],
                                             (dist - self.tgt_dist))))
+        if self.error_int is None:
+            self.error_int = err
+        else:
+            self.error_int += err
+        self.error_int[0] =  50 if self.error_int[0] >  50 else self.error_int[0]
+        self.error_int[1] =  50 if self.error_int[1] >  50 else self.error_int[1]
+        self.error_int[0] = -50 if self.error_int[0] < -50 else self.error_int[0]
+        self.error_int[1] = -50 if self.error_int[1] < -50 else self.error_int[1]
+        # vel_local = self.k_dist * np.dot(np.transpose(self.tgt_pos_local),
+        #                             np.transpose(np.multiply( self.adj_mtx[self.index_id, :],
+        #                                     (dist - self.tgt_dist))))
+        vel_local = self.k_dist * err + self.ki_dist * self.error_int
         # print(dist - self.target_dist)
         vel_local_frd = [vel_local[1], vel_local[0]]
         return np.array(vel_local_frd)

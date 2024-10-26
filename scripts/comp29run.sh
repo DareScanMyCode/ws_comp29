@@ -71,7 +71,7 @@ export DISPLAY=:0
 
 echo ">>> 构建与source"
 cd ~/ws_comp29
-colcon build
+colcon build --packages-skip px4_msgs px4_ros_com
 
 source ~/ws_comp29/install/setup.bash
 

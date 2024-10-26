@@ -19,7 +19,7 @@ class HightCtrl:
             vz = self.k_p * (self.tgt_height - height) + self.k_i * (self.tgt_height - height - self.pre_height)
         self.pre_height = height
         if vz<-0.3:
-            vz=0.3
+            vz=-0.3
         if vz>0.3:
             vz=0.3
         return -vz

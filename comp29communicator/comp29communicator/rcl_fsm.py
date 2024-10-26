@@ -564,7 +564,7 @@ def main(args=None):
 
             #
             # 显示网络速度
-            node.get_logger().info(f"{Style.BRIGHT }{ Fore.BLUE}[fsm flow monitor] In_rate: {networkIn}    Out_rate: {networkOut} {Style.RESET_ALL}")
+            # node.get_logger().info(f"{Style.BRIGHT }{ Fore.BLUE}[fsm flow monitor] In_rate: {networkIn}    Out_rate: {networkOut} {Style.RESET_ALL}")
             # print(Style.BRIGHT + Fore.BLUE + "[fsm flow monitor] In_rate: ", networkIn, "    Out_rate: ", networkOut)
             # print (Style.RESET_ALL)
 

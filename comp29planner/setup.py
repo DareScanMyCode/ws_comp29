@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/comp29launch_all.py']),
+        ('share/' + package_name + '/launch', ['launch/comp29launch_sim.py']),
         ('share/' + package_name + '/launch', ['launch/comp29test_form.py']),
         ('share/' + package_name + '/launch', ['launch/comp29test_fsm.py']),
         ('share/' + package_name + '/launch', ['launch/comp29test_form_leaving.py']),
@@ -28,7 +29,8 @@ setup(
         'console_scripts': [
             "test_rend = comp29planner.test_rend:main",
             "test_formation = comp29planner.test_formation:main",
-            "comp29main = comp29planner.comp29planner_main:main"
+            "comp29main = comp29planner.comp29planner_main:main",
+            "real2sim = comp29planner.real2sim_uav:main"
         ],
     },
 )

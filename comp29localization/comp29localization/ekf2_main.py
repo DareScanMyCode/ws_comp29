@@ -1402,7 +1402,8 @@ def main(args=None):
             # 这里因为dt很小所以 * 10.1
             # 否则乘以5.1甚至2.1就够了
             if not is_pos_optimized and t_uwb_stage >= t_uwb_sampling + t_uwb_recv_cutoff - dt * 10.1 and t_uwb_stage <= t_uwb_sampling + t_uwb_recv_cutoff - dt * 1.1:
-                if is_debugging_uwb:
+                # if is_debugging_uwb:
+                if False:
                     print(Style.BRIGHT + Fore.LIGHTMAGENTA_EX + "[ekf2 uwb] calculating data ..., t_all, t_stage %f %f" % (t_uwb, t_uwb_stage, ) + Style.RESET_ALL)
                     #
                     print(Fore.LIGHTMAGENTA_EX + "[ekf2 uwb] dist mat")

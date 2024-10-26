@@ -121,7 +121,7 @@ EOF
 }
 
 # 目标IP地址范围
-for i in {201..204}; do
+for i in {201..206}; do
     IP="192.168.151.$i"
     # IP="192.168.151.202"
     echo -e ">>> Trying to deploy on ${YELLOW}$IP ${NC}"
